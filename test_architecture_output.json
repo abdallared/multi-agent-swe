@@ -1,0 +1,206 @@
+{
+  "tech_stack": {
+    "backend": {
+      "framework": "FastAPI",
+      "language": "Python 3.11",
+      "orm": "SQLAlchemy 2.0",
+      "authentication": "JWT"
+    },
+    "frontend": {
+      "framework": "React",
+      "language": "TypeScript",
+      "state_management": "Zustand",
+      "styling": "Tailwind CSS"
+    },
+    "database": {
+      "primary": "PostgreSQL",
+      "cache": "Redis",
+      "search": null
+    }
+  },
+  "database_schema": {
+    "tables": [
+      {
+        "name": "users",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "nullable": false,
+            "primary_key": true,
+            "unique": true,
+            "default": "uuid_generate_v4()"
+          },
+          {
+            "name": "email",
+            "type": "VARCHAR(255)",
+            "nullable": false,
+            "primary_key": false,
+            "unique": true,
+            "default": null
+          },
+          {
+            "name": "hashed_password",
+            "type": "VARCHAR(255)",
+            "nullable": false,
+            "primary_key": false,
+            "unique": false,
+            "default": null
+          }
+        ],
+        "indexes": [
+          "email"
+        ],
+        "relationships": []
+      },
+      {
+        "name": "todos",
+        "columns": [
+          {
+            "name": "id",
+            "type": "UUID",
+            "nullable": false,
+            "primary_key": true,
+            "unique": true,
+            "default": "uuid_generate_v4()"
+          },
+          {
+            "name": "user_id",
+            "type": "UUID",
+            "nullable": false,
+            "primary_key": false,
+            "unique": false,
+            "default": null
+          },
+          {
+            "name": "title",
+            "type": "VARCHAR(255)",
+            "nullable": false,
+            "primary_key": false,
+            "unique": false,
+            "default": null
+          },
+          {
+            "name": "description",
+            "type": "TEXT",
+            "nullable": true,
+            "primary_key": false,
+            "unique": false,
+            "default": null
+          },
+          {
+            "name": "is_completed",
+            "type": "BOOLEAN",
+            "nullable": false,
+            "primary_key": false,
+            "unique": false,
+            "default": "false"
+          },
+          {
+            "name": "priority",
+            "type": "INTEGER",
+            "nullable": false,
+            "primary_key": false,
+            "unique": false,
+            "default": "1"
+          }
+        ],
+        "indexes": [
+          "user_id"
+        ],
+        "relationships": [
+          {
+            "type": "many_to_one",
+            "table": "users",
+            "foreign_key": "user_id"
+          }
+        ]
+      }
+    ]
+  },
+  "api_design": {
+    "type": "REST",
+    "base_url": "/api/v1",
+    "endpoints": [
+      {
+        "path": "/auth/register",
+        "method": "POST",
+        "description": "Registers a new user.",
+        "authentication_required": false
+      },
+      {
+        "path": "/auth/login",
+        "method": "POST",
+        "description": "Authenticates user and returns JWT token.",
+        "authentication_required": false
+      },
+      {
+        "path": "/todos",
+        "method": "POST",
+        "description": "Creates a new todo item for the authenticated user.",
+        "authentication_required": true
+      },
+      {
+        "path": "/todos",
+        "method": "GET",
+        "description": "Retrieves all todo items for the authenticated user.",
+        "authentication_required": true
+      },
+      {
+        "path": "/todos/{todo_id}",
+        "method": "PATCH",
+        "description": "Updates an existing todo item (title, description, priority, completion status).",
+        "authentication_required": true
+      },
+      {
+        "path": "/todos/{todo_id}",
+        "method": "DELETE",
+        "description": "Deletes a todo item owned by the authenticated user.",
+        "authentication_required": true
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "auth_service",
+      "type": "backend",
+      "description": "Handles user registration, login, JWT generation, and password hashing (bcrypt).",
+      "dependencies": [
+        "database"
+      ]
+    },
+    {
+      "name": "todo_service",
+      "type": "backend",
+      "description": "Contains business logic for CRUD operations on tasks, enforcing ownership checks.",
+      "dependencies": [
+        "auth_service",
+        "database"
+      ]
+    },
+    {
+      "name": "frontend_ui",
+      "type": "frontend",
+      "description": "The user interface layer built with React, handling state and API calls.",
+      "dependencies": [
+        "shared_types"
+      ]
+    },
+    {
+      "name": "shared_types",
+      "type": "shared",
+      "description": "Defines common data structures (e.g., Todo model, User response schema) used by both frontend and backend.",
+      "dependencies": []
+    }
+  ],
+  "deployment_strategy": {
+    "containerization": "Docker",
+    "orchestration": "Docker Compose",
+    "ci_cd": "GitHub Actions"
+  },
+  "metadata": {
+    "complexity": "simple",
+    "estimated_setup_time": "1 week",
+    "recommended_team_size": 1
+  }
+}
