@@ -15,7 +15,7 @@
     "database": {
       "primary": "PostgreSQL",
       "cache": "Redis",
-      "search": null
+      "search": "optional"
     }
   },
   "database_schema": {
@@ -33,7 +33,7 @@
           },
           {
             "name": "email",
-            "type": "VARCHAR(255)",
+            "type": "VARCHAR",
             "nullable": false,
             "primary_key": false,
             "unique": true,
@@ -41,7 +41,7 @@
           },
           {
             "name": "hashed_password",
-            "type": "VARCHAR(255)",
+            "type": "VARCHAR",
             "nullable": false,
             "primary_key": false,
             "unique": false,
@@ -54,7 +54,7 @@
         "relationships": []
       },
       {
-        "name": "todos",
+        "name": "notes",
         "columns": [
           {
             "name": "id",
@@ -74,39 +74,32 @@
           },
           {
             "name": "title",
-            "type": "VARCHAR(255)",
+            "type": "VARCHAR",
             "nullable": false,
             "primary_key": false,
             "unique": false,
             "default": null
           },
           {
-            "name": "description",
+            "name": "content",
             "type": "TEXT",
-            "nullable": true,
+            "nullable": false,
             "primary_key": false,
             "unique": false,
             "default": null
           },
           {
-            "name": "is_completed",
-            "type": "BOOLEAN",
+            "name": "created_at",
+            "type": "TIMESTAMP WITH TIME ZONE",
             "nullable": false,
             "primary_key": false,
             "unique": false,
-            "default": "false"
-          },
-          {
-            "name": "priority",
-            "type": "INTEGER",
-            "nullable": false,
-            "primary_key": false,
-            "unique": false,
-            "default": "1"
+            "default": "now()"
           }
         ],
         "indexes": [
-          "user_id"
+          "user_id",
+          "created_at"
         ],
         "relationships": [
           {
@@ -135,27 +128,33 @@
         "authentication_required": false
       },
       {
-        "path": "/todos",
-        "method": "POST",
-        "description": "Creates a new todo item for the authenticated user.",
-        "authentication_required": true
-      },
-      {
-        "path": "/todos",
+        "path": "/notes",
         "method": "GET",
-        "description": "Retrieves all todo items for the authenticated user.",
+        "description": "Retrieves all notes for the authenticated user, sorted by date.",
         "authentication_required": true
       },
       {
-        "path": "/todos/{todo_id}",
-        "method": "PATCH",
-        "description": "Updates an existing todo item (title, description, priority, completion status).",
+        "path": "/notes",
+        "method": "POST",
+        "description": "Creates a new note for the authenticated user.",
         "authentication_required": true
       },
       {
-        "path": "/todos/{todo_id}",
+        "path": "/notes/{note_id}",
+        "method": "PUT",
+        "description": "Updates an existing note.",
+        "authentication_required": true
+      },
+      {
+        "path": "/notes/{note_id}",
         "method": "DELETE",
-        "description": "Deletes a todo item owned by the authenticated user.",
+        "description": "Deletes a specific note.",
+        "authentication_required": true
+      },
+      {
+        "path": "/notes/clear",
+        "method": "DELETE",
+        "description": "Deletes all notes for the authenticated user.",
         "authentication_required": true
       }
     ]
@@ -164,32 +163,27 @@
     {
       "name": "auth_service",
       "type": "backend",
-      "description": "Handles user registration, login, JWT generation, and password hashing (bcrypt).",
-      "dependencies": [
-        "database"
-      ]
+      "description": "Handles user registration, login, and JWT token generation/validation.",
+      "dependencies": []
     },
     {
-      "name": "todo_service",
+      "name": "note_service",
       "type": "backend",
-      "description": "Contains business logic for CRUD operations on tasks, enforcing ownership checks.",
+      "description": "Contains core business logic for CRUD operations on notes, enforcing ownership.",
       "dependencies": [
-        "auth_service",
-        "database"
+        "auth_service"
       ]
     },
     {
-      "name": "frontend_ui",
+      "name": "ui_components",
       "type": "frontend",
-      "description": "The user interface layer built with React, handling state and API calls.",
-      "dependencies": [
-        "shared_types"
-      ]
+      "description": "Reusable UI elements (NoteCard, InputField, etc.) built with React/Tailwind.",
+      "dependencies": []
     },
     {
-      "name": "shared_types",
-      "type": "shared",
-      "description": "Defines common data structures (e.g., Todo model, User response schema) used by both frontend and backend.",
+      "name": "state_manager",
+      "type": "frontend",
+      "description": "Manages the global state of notes and user session using Zustand.",
       "dependencies": []
     }
   ],

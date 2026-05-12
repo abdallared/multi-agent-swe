@@ -20,13 +20,32 @@ class FrontendAgent(BaseAgent):
 
 Your role is to generate production-ready frontend code.
 
+CRITICAL REQUIREMENTS:
+1. api.ts MUST use: const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+2. MUST include complete build setup:
+   - package.json with "dev", "build", "preview" scripts
+   - vite.config.ts (NOT webpack)
+   - tsconfig.json with React + TypeScript config
+   - index.html as entry point
+   - main.tsx as React entry point
+3. Use modern, professional UI design with Tailwind CSS:
+   - Clean color scheme (blue/indigo primary, gray neutrals)
+   - Proper spacing and padding
+   - Responsive design
+   - Hover states and transitions
+   - Card-based layouts with shadows
+4. Use TypeScript with proper types
+5. Include ALL necessary imports
+
 You must output valid JSON with this structure:
 {
     "files": {
         "src/App.tsx": "// React App component...",
         "src/pages/Home.tsx": "// Home page...",
-        "src/services/api.ts": "// API service...",
-        "package.json": "{ dependencies... }"
+        "src/services/api.ts": "// API service with correct URL...",
+        "package.json": "{ dependencies... }",
+        "vite.config.ts": "// Vite configuration...",
+        "index.html": "<!DOCTYPE html>..."
     }
 }
 
@@ -132,20 +151,29 @@ Key Features:
 
 Generate these essential files (keep each file under 40 lines):
 1. src/App.tsx - Main React component with routing
-2. src/pages/Home.tsx - Home page component
+2. src/pages/Home.tsx - Home page component with professional design
 3. src/pages/Login.tsx - Login page component
-4. src/services/api.ts - API service for backend calls
-5. package.json - NPM dependencies
+4. src/services/api.ts - API service (MUST use: const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api')
+5. package.json - NPM dependencies with "dev", "build", "preview" scripts
+6. vite.config.ts - Vite configuration
+7. index.html - HTML entry point
+8. main.tsx - React entry point
 
-Requirements:
-- Use TypeScript
+CRITICAL REQUIREMENTS:
+- api.ts MUST point to http://localhost:8000/api (NOT example.com)
+- MUST include complete build setup (package.json scripts, vite.config.ts, tsconfig.json, index.html, main.tsx)
+- Use professional UI design with Tailwind CSS:
+  * Modern color scheme (blue-600 primary, gray-50 backgrounds)
+  * Proper spacing (px-4, py-2, gap-4, etc.)
+  * Card layouts with shadows (bg-white, rounded-lg, shadow)
+  * Hover effects (hover:bg-blue-700, hover:underline)
+  * Responsive containers (container mx-auto, max-w-md)
+- Use TypeScript with proper types
 - Use React Router for navigation
-- Use Axios for API calls
-- Keep code VERY concise (max 40 lines per file)
+- Use Axios for API calls with interceptors
 - Modern React with hooks
-- Responsive design with Tailwind CSS
-- No complex state management
-- Focus on core functionality only
+- Keep code concise (max 40 lines per file)
+- Focus on core functionality
 
 Output ONLY valid JSON with "files" key. Keep total response under 1500 tokens."""
     
@@ -235,20 +263,34 @@ const Navbar: React.FC = () => {{
   }};
 
   return (
-    <nav className="bg-blue-600 text-white px-6 py-4 flex justify-between items-center shadow">
-      <Link to="/" className="text-xl font-bold">{project_name}</Link>
-      <div className="flex gap-4">
-        {{isAuthenticated ? (
-          <>
-            <Link to="/dashboard" className="hover:underline">Dashboard</Link>
-            <button onClick={{handleLogout}} className="hover:underline">Logout</button>
-          </>
-        ) : (
-          <>
-            <Link to="/login" className="hover:underline">Login</Link>
-            <Link to="/register" className="hover:underline">Register</Link>
-          </>
-        )}}
+    <nav className="bg-white border-b border-gray-200 shadow-sm">
+      <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+        <Link to="/" className="text-2xl font-bold text-blue-600 hover:text-blue-700 transition">
+          {project_name}
+        </Link>
+        <div className="flex gap-6 items-center">
+          {{isAuthenticated ? (
+            <>
+              <Link to="/dashboard" className="text-gray-700 hover:text-blue-600 font-medium transition">
+                Dashboard
+              </Link>
+              <button onClick={{handleLogout}} 
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition">
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" className="text-gray-700 hover:text-blue-600 font-medium transition">
+                Login
+              </Link>
+              <Link to="/register" 
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm">
+                Sign Up
+              </Link>
+            </>
+          )}}
+        </div>
       </div>
     </nav>
   );
@@ -260,16 +302,41 @@ export default Navbar;
 import {{ Link }} from 'react-router-dom';
 
 const Home: React.FC = () => (
-  <div className="container mx-auto px-4 py-16 text-center">
-    <h1 className="text-5xl font-bold mb-6 text-gray-800">{project_name}</h1>
-    <p className="text-xl text-gray-600 mb-8">Manage your {resource} efficiently</p>
-    <div className="flex gap-4 justify-center">
-      <Link to="/register" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium">
-        Get Started
-      </Link>
-      <Link to="/login" className="border border-blue-600 text-blue-600 px-6 py-3 rounded-lg hover:bg-blue-50 font-medium">
-        Login
-      </Link>
+  <div className="min-h-[80vh] flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="container mx-auto px-4 py-16 text-center">
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-6xl font-bold mb-6 text-gray-900 tracking-tight">{project_name}</h1>
+        <p className="text-xl text-gray-600 mb-10 leading-relaxed">
+          Manage your {resource} efficiently with our modern, intuitive platform
+        </p>
+        <div className="flex gap-4 justify-center flex-wrap">
+          <Link to="/register" 
+            className="bg-blue-600 text-white px-8 py-4 rounded-lg hover:bg-blue-700 font-semibold text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
+            Get Started Free
+          </Link>
+          <Link to="/login" 
+            className="bg-white border-2 border-blue-600 text-blue-600 px-8 py-4 rounded-lg hover:bg-blue-50 font-semibold text-lg shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
+            Sign In
+          </Link>
+        </div>
+        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-xl shadow-md">
+            <div className="text-blue-600 text-3xl mb-3">⚡</div>
+            <h3 className="font-semibold text-gray-800 mb-2">Fast & Efficient</h3>
+            <p className="text-gray-600 text-sm">Lightning-fast performance for all your needs</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-md">
+            <div className="text-blue-600 text-3xl mb-3">🔒</div>
+            <h3 className="font-semibold text-gray-800 mb-2">Secure & Private</h3>
+            <p className="text-gray-600 text-sm">Your data is protected with industry-standard security</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-md">
+            <div className="text-blue-600 text-3xl mb-3">📱</div>
+            <h3 className="font-semibold text-gray-800 mb-2">Responsive Design</h3>
+            <p className="text-gray-600 text-sm">Works seamlessly on all devices</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 );
@@ -284,38 +351,61 @@ const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     try {
       const response = await api.login(username, password);
       localStorage.setItem('token', response.access_token);
       navigate('/dashboard');
     } catch {
       setError('Invalid username or password');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-12 max-w-md">
-      <h1 className="text-3xl font-bold mb-6 text-center">Login</h1>
-      {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow space-y-4">
-        <input type="text" placeholder="Username" value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
-        <input type="password" placeholder="Password" value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium">
-          Login
-        </button>
-        <p className="text-center text-gray-600">
-          No account? <Link to="/register" className="text-blue-600 hover:underline">Register</Link>
+    <div className="min-h-[80vh] flex items-center justify-center bg-gray-50 px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Welcome Back</h1>
+          <p className="text-gray-600">Sign in to your account</p>
+        </div>
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow-lg space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              placeholder="Enter your username" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              placeholder="Enter your password" required />
+          </div>
+          <button type="submit" disabled={loading}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold text-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+        <p className="text-center text-gray-600 mt-6">
+          Don't have an account?{' '}
+          <Link to="/register" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline">
+            Create one
+          </Link>
         </p>
-      </form>
+      </div>
     </div>
   );
 };
@@ -329,37 +419,69 @@ import { api } from '../services/api';
 const Register: React.FC = () => {
   const [form, setForm] = useState({ email: '', username: '', password: '' });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
     try {
       await api.register(form.email, form.username, form.password);
       navigate('/login');
     } catch {
-      setError('Registration failed. Try a different username or email.');
+      setError('Registration failed. Username or email may already be taken.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-12 max-w-md">
-      <h1 className="text-3xl font-bold mb-6 text-center">Register</h1>
-      {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-lg shadow space-y-4">
-        {(['email', 'username', 'password'] as const).map((field) => (
-          <input key={field} type={field === 'password' ? 'password' : 'text'}
-            placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
-            value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-            className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
-        ))}
-        <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 font-medium">
-          Register
-        </button>
-        <p className="text-center text-gray-600">
-          Have an account? <Link to="/login" className="text-blue-600 hover:underline">Login</Link>
+    <div className="min-h-[80vh] flex items-center justify-center bg-gray-50 px-4 py-12">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Create Account</h1>
+          <p className="text-gray-600">Join us today</p>
+        </div>
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
+        <form onSubmit={handleSubmit} className="bg-white p-8 rounded-xl shadow-lg space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <input type="email" value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              placeholder="your@email.com" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+            <input type="text" value={form.username}
+              onChange={(e) => setForm({ ...form, username: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              placeholder="Choose a username" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <input type="password" value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              placeholder="Create a strong password" required />
+          </div>
+          <button type="submit" disabled={loading}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold text-lg shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            {loading ? 'Creating account...' : 'Create Account'}
+          </button>
+        </form>
+        <p className="text-center text-gray-600 mt-6">
+          Already have an account?{' '}
+          <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline">
+            Sign in
+          </Link>
         </p>
-      </form>
+      </div>
     </div>
   );
 };
@@ -381,6 +503,7 @@ const Dashboard: React.FC = () => {{
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {{
     api.get{Resource}s().then(set{Resource}s).finally(() => setLoading(false));
@@ -388,47 +511,94 @@ const Dashboard: React.FC = () => {{
 
   const handleCreate = async (e: React.FormEvent) => {{
     e.preventDefault();
-    const newItem = await api.create{Resource}({{ title, description }});
-    set{Resource}s(prev => [...prev, newItem]);
-    setTitle('');
-    setDescription('');
+    setCreating(true);
+    try {{
+      const newItem = await api.create{Resource}({{ title, description }});
+      set{Resource}s(prev => [...prev, newItem]);
+      setTitle('');
+      setDescription('');
+    }} finally {{
+      setCreating(false);
+    }}
   }};
 
   const handleDelete = async (id: number) => {{
+    if (!confirm('Are you sure you want to delete this item?')) return;
     await api.delete{Resource}(id);
     set{Resource}s(prev => prev.filter(item => item.id !== id));
   }};
 
-  if (loading) return <div className="text-center py-12">Loading...</div>;
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6">My {Resource}s</h1>
-      <form onSubmit={{handleCreate}} className="bg-white p-6 rounded-lg shadow mb-6 space-y-3">
-        <input type="text" placeholder="{Resource} title" value={{title}}
-          onChange={{(e) => setTitle(e.target.value)}}
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
-        <input type="text" placeholder="Description (optional)" value={{description}}
-          onChange={{(e) => setDescription(e.target.value)}}
-          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-          Add {Resource}
-        </button>
-      </form>
-      <div className="space-y-3">
-        {{{resource}.map(item => (
-          <div key={{item.id}} className="bg-white p-4 rounded-lg shadow flex justify-between items-center">
-            <div>
-              <h3 className="font-medium text-gray-800">{{item.title}}</h3>
-              {{item.description && <p className="text-sm text-gray-500">{{item.description}}</p>}}
-            </div>
-            <button onClick={{() => handleDelete(item.id)}}
-              className="text-red-500 hover:text-red-700 font-medium text-sm">
-              Delete
-            </button>
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-gray-900 mb-2">My {Resource}s</h1>
+        <p className="text-gray-600">Manage and organize your {resource}</p>
+      </div>
+      
+      <form onSubmit={{handleCreate}} className="bg-white p-6 rounded-xl shadow-lg mb-8 border border-gray-100">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Create New {Resource}</h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{Resource} Title</label>
+            <input type="text" placeholder="Enter title" value={{title}}
+              onChange={{(e) => setTitle(e.target.value)}}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              required />
           </div>
-        ))}}
-        {{!{resource}.length && <p className="text-center text-gray-500 py-8">No {resource} yet. Create one above!</p>}}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Description (optional)</label>
+            <textarea placeholder="Add a description" value={{description}}
+              onChange={{(e) => setDescription(e.target.value)}} rows={{3}}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none" />
+          </div>
+          <button type="submit" disabled={{creating}}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            {{creating ? 'Creating...' : '+ Add {Resource}'}}
+          </button>
+        </div>
+      </form>
+
+      <div className="space-y-4">
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Your {Resource}s ({{{{resource}}.length}})</h2>
+        {{{resource}.length === 0 ? (
+          <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-12 text-center">
+            <div className="text-gray-400 text-5xl mb-4">📝</div>
+            <p className="text-gray-600 text-lg mb-2">No {resource} yet</p>
+            <p className="text-gray-500">Create your first {resource_singular} using the form above</p>
+          </div>
+        ) : (
+          {{{resource}.map(item => (
+            <div key={{item.id}} 
+              className="bg-white p-6 rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg text-gray-900 mb-1">{{item.title}}</h3>
+                  {{item.description && (
+                    <p className="text-gray-600 text-sm leading-relaxed">{{item.description}}</p>
+                  )}}
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className={{`text-xs px-2 py-1 rounded-full ${{item.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}}`}}>
+                      {{item.is_active ? '✓ Active' : 'Inactive'}}
+                    </span>
+                  </div>
+                </div>
+                <button onClick={{() => handleDelete(item.id)}}
+                  className="ml-4 text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg font-medium text-sm transition-colors">
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}}
+        )}}
       </div>
     </div>
   );

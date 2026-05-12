@@ -20,12 +20,23 @@ class BackendAgent(BaseAgent):
 
 Your role is to generate production-ready backend code.
 
+CRITICAL REQUIREMENTS:
+1. ALL SQLAlchemy models MUST include these imports:
+   - from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+   - from app.core.database import Base
+   - Must have __tablename__ attribute
+2. auth.py MUST use bcrypt password hashing:
+   - from app.core.security import get_password_hash, verify_password
+   - NEVER store plain text passwords
+3. Include ALL necessary imports in every file
+4. Use proper FastAPI patterns with dependency injection
+
 You must output valid JSON with this structure:
 {
     "files": {
         "app/main.py": "# FastAPI main application code...",
-        "app/models/user.py": "# SQLAlchemy User model...",
-        "app/api/auth.py": "# Authentication endpoints...",
+        "app/models/user.py": "# SQLAlchemy User model with ALL imports...",
+        "app/api/auth.py": "# Authentication with bcrypt hashing...",
         "requirements.txt": "fastapi==0.104.1\\nuvicorn[standard]==0.24.0\\n..."
     }
 }
@@ -122,14 +133,16 @@ API Endpoints:
 Generate these essential files (keep each file under 30 lines):
 1. app/main.py - FastAPI application entry point (basic setup only)
 2. app/core/config.py - Configuration settings (minimal)
-3. app/models/user.py - User SQLAlchemy model (basic fields only)
-4. app/api/auth.py - Authentication endpoints (register, login only)
+3. app/models/user.py - User SQLAlchemy model (MUST include: from sqlalchemy import Column, Integer, String, Boolean; from app.core.database import Base; __tablename__ = "users")
+4. app/api/auth.py - Authentication endpoints (MUST use: from app.core.security import get_password_hash, verify_password for password hashing)
 5. requirements.txt - Python dependencies (essential packages only)
 
-Requirements:
+CRITICAL REQUIREMENTS:
+- ALL models MUST have: proper imports (Column, Integer, String, etc.), Base import, __tablename__
+- auth.py MUST use get_password_hash() and verify_password() - NEVER plain text passwords
+- Include ALL necessary imports in every file
 - Keep code VERY concise (max 30 lines per file)
 - Use simple, straightforward implementations
-- Include only essential imports
 - No complex error handling
 - No docstrings (to save space)
 - Focus on core functionality only
@@ -165,9 +178,9 @@ Output ONLY valid JSON with "files" key. Keep total response under 1500 tokens."
     
     def _generate_fallback_backend(self, architecture: Dict, plan: Dict) -> Dict[str, Any]:
         """
-        توليد backend code كامل كـ fallback
+        توليد backend code كامل كـ fallback مع تحسينات
         """
-        self.logger.info("Generating comprehensive fallback backend code")
+        self.logger.info("Generating comprehensive fallback backend code with improvements")
         
         project_name = plan['project_name'].replace(' ', '_').lower()
         db_tables = architecture.get('database_schema', {}).get('tables', [])
@@ -177,6 +190,13 @@ Output ONLY valid JSON with "files" key. Keep total response under 1500 tokens."
         main_table = next((t for t in db_tables if t['name'] != 'users'), None)
         table_name = main_table['name'] if main_table else 'items'
         table_name_singular = table_name.rstrip('s')
+        
+        # استخراج columns من main_table
+        main_columns = []
+        if main_table and 'columns' in main_table:
+            for col in main_table['columns']:
+                if col['name'] not in ['id', 'created_at', 'updated_at', 'user_id']:
+                    main_columns.append(col)
         
         files = {
             "app/__init__.py": "",
