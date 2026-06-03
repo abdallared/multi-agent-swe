@@ -16,32 +16,53 @@ class BackendAgent(BaseAgent):
     """
     
     def get_system_prompt(self) -> str:
-        return """You are an expert backend developer specializing in FastAPI and Python.
+        return """You are a senior Python backend developer specializing in FastAPI, SQLAlchemy, and production-grade REST APIs.
 
-Your role is to generate production-ready backend code.
+Your role is to generate complete, correct, runnable FastAPI backend code.
 
-CRITICAL REQUIREMENTS:
-1. ALL SQLAlchemy models MUST include these imports:
-   - from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+CODE QUALITY STANDARDS:
+1. EVERY Python file MUST have all its imports at the top — never omit an import
+2. SQLAlchemy models MUST include:
+   - from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+   - from sqlalchemy.orm import relationship
    - from app.core.database import Base
-   - Must have __tablename__ attribute
-2. auth.py MUST use bcrypt password hashing:
-   - from app.core.security import get_password_hash, verify_password
+   - __tablename__ = "table_name"
+3. Password security is NON-NEGOTIABLE:
+   - ALWAYS use: from app.core.security import get_password_hash, verify_password
    - NEVER store plain text passwords
-3. Include ALL necessary imports in every file
-4. Use proper FastAPI patterns with dependency injection
+   - NEVER compare plain text passwords
+4. JWT authentication:
+   - Use python-jose for JWT encoding/decoding
+   - Include get_current_user dependency for protected routes
+   - Return proper 401 errors for invalid/missing tokens
+5. All endpoints must have proper HTTP status codes and error handling
+6. Use Pydantic v2 models for request/response validation
+7. Include CORS middleware in main.py
+8. Database session management: always use get_db() dependency injection
 
-You must output valid JSON with this structure:
-{
-    "files": {
-        "app/main.py": "# FastAPI main application code...",
-        "app/models/user.py": "# SQLAlchemy User model with ALL imports...",
-        "app/api/auth.py": "# Authentication with bcrypt hashing...",
-        "requirements.txt": "fastapi==0.104.1\\nuvicorn[standard]==0.24.0\\n..."
-    }
-}
+FILE STRUCTURE (generate ALL of these):
+- app/__init__.py (empty)
+- app/main.py (FastAPI app, CORS, routers, DB init)
+- app/core/__init__.py (empty)
+- app/core/config.py (Pydantic Settings with .env support)
+- app/core/database.py (SQLAlchemy engine, session, Base, get_db)
+- app/core/security.py (password hashing, JWT creation/verification, get_current_user)
+- app/models/__init__.py (empty)
+- app/models/user.py (User SQLAlchemy model)
+- app/models/{resource}.py (Main resource SQLAlchemy model with ForeignKey to users)
+- app/schemas/__init__.py (empty)
+- app/schemas/user.py (UserCreate, UserLogin, UserOut, Token Pydantic models)
+- app/schemas/{resource}.py (ResourceCreate, ResourceUpdate, ResourceOut Pydantic models)
+- app/api/__init__.py (empty)
+- app/api/auth.py (POST /register, POST /login)
+- app/api/{resource}.py (Full CRUD: GET /, GET /{id}, POST /, PUT /{id}, DELETE /{id})
+- requirements.txt (pinned versions)
+- .env.example
 
-Generate clean, well-documented, production-ready code following best practices."""
+OUTPUT FORMAT — valid JSON only:
+{"files": {"app/main.py": "complete code", "app/core/config.py": "complete code", ...}}
+
+Generate COMPLETE files with ALL code — do not truncate or use ellipsis."""
     
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -68,8 +89,8 @@ Generate clean, well-documented, production-ready code following best practices.
                 response = self.call_llm(
                     prompt=backend_prompt,
                     json_mode=True,
-                    temperature=0.1,  # أقل للاستقرار
-                    max_tokens=1800  # أقل لتجنب القطع
+                    temperature=0.1,
+                    max_tokens=4000  # full budget for complete files
                 )
                 
                 # Parse JSON
@@ -117,37 +138,34 @@ Generate clean, well-documented, production-ready code following best practices.
             for ep in endpoints[:5]
         ])
         
-        return f"""Generate a complete FastAPI backend application.
+        return f"""Generate a COMPLETE FastAPI backend application. Every file must be complete — no truncation.
 
 Project: {plan['project_name']}
+Description: {plan.get('description', '')}
 Framework: {tech_stack['framework']}
 Database: {architecture['tech_stack']['database']['primary']}
 ORM: {tech_stack['orm']}
 
-Database Tables:
+Database Tables to implement:
 {tables_summary}
 
-API Endpoints:
+API Endpoints to implement:
 {endpoints_summary}
 
-Generate these essential files (keep each file under 30 lines):
-1. app/main.py - FastAPI application entry point (basic setup only)
-2. app/core/config.py - Configuration settings (minimal)
-3. app/models/user.py - User SQLAlchemy model (MUST include: from sqlalchemy import Column, Integer, String, Boolean; from app.core.database import Base; __tablename__ = "users")
-4. app/api/auth.py - Authentication endpoints (MUST use: from app.core.security import get_password_hash, verify_password for password hashing)
-5. requirements.txt - Python dependencies (essential packages only)
+Generate ALL files in the FILE STRUCTURE listed in your system prompt.
+For the main resource, use: {db_tables[1]['name'] if len(db_tables) > 1 else 'items'}
 
-CRITICAL REQUIREMENTS:
-- ALL models MUST have: proper imports (Column, Integer, String, etc.), Base import, __tablename__
-- auth.py MUST use get_password_hash() and verify_password() - NEVER plain text passwords
-- Include ALL necessary imports in every file
-- Keep code VERY concise (max 30 lines per file)
-- Use simple, straightforward implementations
-- No complex error handling
-- No docstrings (to save space)
-- Focus on core functionality only
+CRITICAL RULES:
+1. Every model file: include ALL sqlalchemy imports + Base import + __tablename__
+2. security.py: include verify_password(), get_password_hash(), create_access_token(), get_current_user()
+3. auth.py: use get_password_hash() for register, verify_password() for login, NEVER plain text
+4. All protected routes: use Depends(get_current_user) for authentication
+5. requirements.txt: pin exact versions (fastapi==0.104.1, uvicorn[standard]==0.24.0, sqlalchemy==2.0.23, pydantic==2.5.0, pydantic-settings==2.1.0, python-jose[cryptography]==3.3.0, passlib[bcrypt]==1.7.4, python-multipart==0.0.6, email-validator==2.1.0)
+6. Include proper 404, 400, 401 HTTP exceptions
+7. main.py: CORS middleware with allow_origins=["*"], include all routers
+8. COMPLETE code only — no "# ... rest of code" or "# TODO" placeholders
 
-Output ONLY valid JSON with "files" key. Keep total response under 1500 tokens."""
+Output ONLY valid JSON with \"files\" key mapping filename to complete file content."""
     
     def _parse_json_response(self, response: str) -> Dict:
         """

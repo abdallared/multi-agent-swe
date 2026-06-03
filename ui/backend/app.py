@@ -49,7 +49,10 @@ class ProjectGenerator:
     
     def __init__(self, websocket: WebSocket):
         self.ws = websocket
-        self.output_dir = Path(settings.output_dir)
+        # Use absolute path relative to this file so output always goes to ui/backend/output/
+        # regardless of where uvicorn is launched from
+        self.output_dir = Path(__file__).parent / "output"
+        self.output_dir.mkdir(exist_ok=True)
     
     async def send_update(self, type: str, data: dict):
         """Send update to client"""
@@ -60,6 +63,19 @@ class ProjectGenerator:
     
     async def generate_project(self, user_prompt: str):
         """Generate complete project with real-time updates"""
+        from agents.base_agent import BaseAgent
+        
+        loop = asyncio.get_running_loop()
+        
+        def verbose_callback(entry: dict):
+            # Safe dispatch to main loop thread
+            asyncio.run_coroutine_threadsafe(
+                self.send_update("verbose", entry),
+                loop
+            )
+            
+        BaseAgent.set_verbose_callback(verbose_callback)
+        
         try:
             # Phase 1: Planning
             await self.send_update("phase_start", {
@@ -69,7 +85,7 @@ class ProjectGenerator:
             })
             
             planner = PlannerAgent(ollama, None)
-            plan_result = planner.execute({'user_prompt': user_prompt})
+            plan_result = await asyncio.to_thread(planner.execute, {'user_prompt': user_prompt})
             plan = plan_result['project_plan']
             
             await self.send_update("phase_complete", {
@@ -91,7 +107,7 @@ class ProjectGenerator:
             })
             
             architect = ArchitectAgent(ollama, None)
-            arch_result = architect.execute({'project_plan': plan})
+            arch_result = await asyncio.to_thread(architect.execute, {'project_plan': plan})
             arch = arch_result['architecture']
             
             await self.send_update("phase_complete", {
@@ -115,7 +131,7 @@ class ProjectGenerator:
             })
             
             backend_agent = BackendAgent(ollama, None)
-            backend_result = backend_agent.execute({
+            backend_result = await asyncio.to_thread(backend_agent.execute, {
                 'project_plan': plan,
                 'architecture': arch
             })
@@ -163,7 +179,7 @@ class ProjectGenerator:
             })
             
             frontend_agent = FrontendAgent(ollama, None)
-            frontend_result = frontend_agent.execute({
+            frontend_result = await asyncio.to_thread(frontend_agent.execute, {
                 'project_plan': plan,
                 'architecture': arch
             })
@@ -189,7 +205,7 @@ class ProjectGenerator:
             })
             
             testing_agent = TestingAgent(ollama, None)
-            test_result = testing_agent.execute({
+            test_result = await asyncio.to_thread(testing_agent.execute, {
                 'project_plan': plan,
                 'architecture': arch,
                 'backend_code': backend_code
@@ -216,7 +232,7 @@ class ProjectGenerator:
             })
             
             docker_agent = DockerAgent(ollama, None)
-            docker_result = docker_agent.execute({
+            docker_result = await asyncio.to_thread(docker_agent.execute, {
                 'project_plan': plan,
                 'architecture': arch
             })
@@ -273,6 +289,8 @@ class ProjectGenerator:
             await self.send_update("error", {
                 "message": str(e)
             })
+        finally:
+            BaseAgent.set_verbose_callback(None)
     
     def _get_file_tree(self, project_dir: Path) -> dict:
         """Get file tree structure"""
@@ -346,15 +364,11 @@ async def download_project(project_name: str):
         
         print(f"🔍 Looking for project: {clean_name}")
         
-        project_path = Path(settings.output_dir) / clean_name
-        
-        print(f"🔍 Project path: {project_path}")
-        print(f"🔍 Path exists: {project_path.exists()}")
+        output_dir = Path(__file__).parent / "output"
+        project_path = output_dir / clean_name
         
         if not project_path.exists():
-            # List available projects
-            available = [p.name for p in Path(settings.output_dir).iterdir() if p.is_dir()]
-            print(f"🔍 Available projects: {available}")
+            available = [p.name for p in output_dir.iterdir() if p.is_dir()] if output_dir.exists() else []
             return {"error": f"Project not found: {clean_name}", "available": available}
         
         # إنشاء ZIP file في الذاكرة
@@ -395,7 +409,8 @@ async def get_file_content(project_name: str, file_path: str):
         clean_name = clean_name.replace(' ', '_')
         clean_name = ''.join(c for c in clean_name if c.isalnum() or c == '_')
         
-        full_path = Path(settings.output_dir) / clean_name / file_path
+        output_dir = Path(__file__).parent / "output"
+        full_path = output_dir / clean_name / file_path
         
         if full_path.exists() and full_path.is_file():
             content = full_path.read_text(encoding='utf-8')
@@ -428,10 +443,10 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     print("\n" + "="*60)
-    print("🚀 AI Software Company Backend")
+    print("AI Software Company Backend")
     print("="*60)
-    print(f"📡 Backend running on: http://localhost:8000")
-    print(f"📚 API Docs: http://localhost:8000/docs")
-    print(f"🔌 WebSocket: ws://localhost:8000/ws/generate")
+    print("Backend running on: http://localhost:8000")
+    print("API Docs:           http://localhost:8000/docs")
+    print("WebSocket:          ws://localhost:8000/ws/generate")
     print("="*60 + "\n")
     uvicorn.run(app, host="127.0.0.1", port=8000)

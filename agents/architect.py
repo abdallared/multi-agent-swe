@@ -16,84 +16,96 @@ class ArchitectAgent(BaseAgent):
     """
     
     def get_system_prompt(self) -> str:
-        return """You are a senior software architect with 15+ years of experience.
+        return """You are a principal software architect with 20+ years designing production systems at scale.
 
-Your role is to design scalable, maintainable, and secure system architectures.
+Your role is to design complete, runnable system architectures that backend and frontend developers can implement directly.
 
-You must output valid JSON with this exact structure:
+ARCHITECTURE STANDARDS:
+1. ALWAYS use FastAPI + SQLAlchemy + SQLite (for simplicity) unless explicitly asked otherwise
+2. ALWAYS use React + TypeScript + Tailwind CSS for the frontend
+3. Design a COMPLETE database schema — every entity mentioned in the plan gets a table
+4. Every table MUST have: id (INTEGER PRIMARY KEY), created_at (DATETIME), and appropriate columns
+5. Define relationships (foreign keys) between tables explicitly
+6. Design ALL necessary API endpoints — include auth endpoints + full CRUD for each resource
+7. Group modules logically: auth, each resource type, shared utilities
+
+TECH STACK (default unless features require otherwise):
+- Backend: FastAPI, Python 3.11, SQLAlchemy 2.0, JWT auth, bcrypt passwords, Pydantic v2
+- Frontend: React 18, TypeScript, Tailwind CSS, React Router v6, Axios
+- Database: SQLite (dev), PostgreSQL (prod)
+- Deployment: Docker + docker-compose
+
+OUTPUT — valid JSON only:
 {
     "tech_stack": {
         "backend": {
-            "framework": "string (e.g., FastAPI, Django, Express)",
-            "language": "string (e.g., Python 3.11, Node.js 18)",
-            "orm": "string (e.g., SQLAlchemy, Prisma)",
-            "authentication": "string (e.g., JWT, OAuth2)"
+            "framework": "FastAPI",
+            "language": "Python 3.11",
+            "orm": "SQLAlchemy 2.0",
+            "authentication": "JWT + bcrypt"
         },
         "frontend": {
-            "framework": "string (e.g., React, Vue, Angular)",
-            "language": "string (e.g., TypeScript, JavaScript)",
-            "state_management": "string (e.g., Redux, Zustand)",
-            "styling": "string (e.g., Tailwind CSS, Material-UI)"
+            "framework": "React 18",
+            "language": "TypeScript",
+            "state_management": "React Hooks + Context",
+            "styling": "Tailwind CSS"
         },
         "database": {
-            "primary": "string (e.g., PostgreSQL, MongoDB)",
-            "cache": "string (e.g., Redis, Memcached)",
-            "search": "string (optional, e.g., Elasticsearch)"
+            "primary": "SQLite",
+            "cache": null,
+            "search": null
         }
     },
     "database_schema": {
         "tables": [
             {
-                "name": "string",
+                "name": "table_name",
                 "columns": [
-                    {
-                        "name": "string",
-                        "type": "string (e.g., UUID, VARCHAR, INTEGER)",
-                        "nullable": boolean,
-                        "primary_key": boolean,
-                        "unique": boolean,
-                        "default": "string (optional)"
-                    }
+                    {"name": "id", "type": "INTEGER", "nullable": false, "primary_key": true, "unique": true, "default": null},
+                    {"name": "created_at", "type": "DATETIME", "nullable": false, "primary_key": false, "unique": false, "default": "CURRENT_TIMESTAMP"}
                 ],
-                "indexes": ["string"],
+                "indexes": ["column_name"],
                 "relationships": [
-                    {
-                        "type": "string (one_to_many, many_to_one, many_to_many)",
-                        "table": "string",
-                        "foreign_key": "string"
-                    }
+                    {"type": "many_to_one", "table": "users", "foreign_key": "user_id"}
                 ]
             }
         ]
     },
     "api_design": {
         "type": "REST",
-        "base_url": "/api/v1",
+        "base_url": "/api",
         "endpoints": [
             {
-                "path": "string",
-                "method": "GET|POST|PUT|DELETE|PATCH",
-                "description": "string",
-                "authentication_required": boolean
+                "path": "/auth/register",
+                "method": "POST",
+                "description": "Register new user account",
+                "authentication_required": false
+            },
+            {
+                "path": "/auth/login",
+                "method": "POST",
+                "description": "Authenticate and receive JWT token",
+                "authentication_required": false
             }
         ]
     },
     "modules": [
         {
-            "name": "string",
-            "type": "backend|frontend|shared",
-            "description": "string",
-            "dependencies": ["string"]
+            "name": "Authentication",
+            "type": "backend",
+            "description": "User registration, login, JWT token management",
+            "dependencies": ["users table", "jose", "passlib"]
         }
     ],
     "deployment_strategy": {
         "containerization": "Docker",
-        "orchestration": "string (e.g., Docker Compose, Kubernetes)",
-        "ci_cd": "string (e.g., GitHub Actions, GitLab CI)"
+        "orchestration": "Docker Compose",
+        "ci_cd": "GitHub Actions"
     }
 }
 
-Choose modern, well-supported technologies with good documentation."""
+Include ALL tables and ALL CRUD endpoints for every resource in the project plan.
+Output ONLY valid JSON, no additional text."""
     
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -117,8 +129,8 @@ Choose modern, well-supported technologies with good documentation."""
         response = self.call_llm(
             prompt=architecture_prompt,
             json_mode=True,
-            temperature=0.2,  # أقل جداً للحصول على JSON صحيح
-            max_tokens=2500  # تقليل الحجم لتجنب القطع
+            temperature=0.1,  # low for deterministic JSON output
+            max_tokens=4000  # enough for complete schema + endpoints
         )
         
         # Parse JSON
@@ -237,16 +249,18 @@ Non-Functional Requirements:
 
 User Stories Count: {len(plan.get('user_stories', []))}
 
-Design a complete architecture following the JSON structure in your system prompt.
+Design the COMPLETE architecture following the JSON structure in your system prompt.
 
-Important:
-1. Choose technologies appropriate for {complexity} complexity
-2. Design a simple database schema (2-4 tables maximum)
-3. Create essential API endpoints only (5-8 endpoints)
-4. Break down into 3-5 modules maximum
-5. Keep it concise and focused
+Requirements:
+1. Use FastAPI + SQLAlchemy + SQLite + React + TypeScript + Tailwind (default stack)
+2. Create a table for EVERY entity mentioned in the features: {list(set(e for f in plan.get('features', []) for e in f.get('entities', [])))}
+3. EVERY table needs: id, created_at, and all business columns
+4. Include ALL CRUD endpoints for each resource (GET list, GET one, POST, PUT, DELETE)
+5. Always include: POST /auth/register and POST /auth/login endpoints
+6. Mark endpoints that need authentication: authentication_required = true
+7. Create a module for each major feature area
 
-Output ONLY valid JSON, no additional text. Keep the response under 2000 tokens."""
+Output ONLY valid JSON, no additional text."""
     
     def _validate_architecture(self, architecture: Dict):
         """

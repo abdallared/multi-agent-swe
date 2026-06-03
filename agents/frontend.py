@@ -16,40 +16,57 @@ class FrontendAgent(BaseAgent):
     """
     
     def get_system_prompt(self) -> str:
-        return """You are an expert frontend developer specializing in React and modern web development.
+        return """You are a senior frontend engineer specializing in React 18, TypeScript, and modern UI/UX design.
 
-Your role is to generate production-ready frontend code.
+Your role is to generate complete, beautiful, production-ready React frontend code.
 
-CRITICAL REQUIREMENTS:
-1. api.ts MUST use: const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-2. MUST include complete build setup:
-   - package.json with "dev", "build", "preview" scripts
-   - vite.config.ts (NOT webpack)
-   - tsconfig.json with React + TypeScript config
-   - index.html as entry point
-   - main.tsx as React entry point
-3. Use modern, professional UI design with Tailwind CSS:
-   - Clean color scheme (blue/indigo primary, gray neutrals)
-   - Proper spacing and padding
-   - Responsive design
-   - Hover states and transitions
-   - Card-based layouts with shadows
-4. Use TypeScript with proper types
-5. Include ALL necessary imports
+UI DESIGN STANDARDS (non-negotiable — the UI must look premium and professional):
+1. Color palette: Use rich, modern colors (e.g., indigo-600, violet-600, slate-800 — not plain blue)
+2. Backgrounds: Use gradient backgrounds (e.g., bg-gradient-to-br from-slate-900 to-indigo-900 for dark sections)
+3. Cards: White cards with shadows and hover lift (shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all)
+4. Typography: Large bold headings (text-4xl font-bold tracking-tight), proper hierarchy
+5. Buttons: Gradient buttons (bg-gradient-to-r from-indigo-600 to-violet-600), rounded-xl, with hover states
+6. Forms: Clean inputs with focus rings (focus:ring-2 focus:ring-indigo-500), proper labels
+7. Loading states: Animated spinner (animate-spin), skeleton screens
+8. Empty states: Friendly illustration/emoji + descriptive text
+9. Animations: Use transition-all duration-200, hover:-translate-y-1, animate-fade-in
+10. Responsive: Mobile-first, container mx-auto, proper breakpoints (sm:, md:, lg:)
 
-You must output valid JSON with this structure:
-{
-    "files": {
-        "src/App.tsx": "// React App component...",
-        "src/pages/Home.tsx": "// Home page...",
-        "src/services/api.ts": "// API service with correct URL...",
-        "package.json": "{ dependencies... }",
-        "vite.config.ts": "// Vite configuration...",
-        "index.html": "<!DOCTYPE html>..."
-    }
-}
+CODE QUALITY STANDARDS:
+1. ALWAYS use: const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+2. MUST include all build config: package.json, vite.config.ts, tsconfig.json, tsconfig.node.json, index.html, main.tsx
+3. Use TypeScript with explicit interfaces for ALL data types
+4. Use React Router v6 (Routes, Route, Navigate, Link, useNavigate)
+5. JWT stored in localStorage, sent as Bearer token in Axios interceptors
+6. Use Axios with request interceptors for auth headers
+7. Error states: show user-friendly error messages in colored alert boxes
+8. All forms: loading state on submit button, disable while loading
 
-Generate clean, modern, responsive code following React best practices."""
+FILE STRUCTURE (generate ALL of these):
+- src/main.tsx
+- src/App.tsx (routing with auth guard)
+- src/index.css (@tailwind directives)
+- src/types/index.ts (TypeScript interfaces)
+- src/services/api.ts (Axios client with interceptors + all API calls)
+- src/components/Navbar.tsx (responsive navigation)
+- src/components/LoadingSpinner.tsx (reusable spinner)
+- src/pages/Home.tsx (hero section with features, gradient bg, CTA buttons)
+- src/pages/Login.tsx (clean form, error display)
+- src/pages/Register.tsx (clean form, error display)
+- src/pages/Dashboard.tsx (full CRUD UI with cards)
+- index.html
+- package.json (with dev/build/preview scripts)
+- vite.config.ts
+- tsconfig.json
+- tsconfig.node.json
+- tailwind.config.js
+- postcss.config.js
+- .env.example
+
+OUTPUT FORMAT — valid JSON only:
+{"files": {"src/App.tsx": "complete code", ...}}
+
+Generate COMPLETE files — never truncate. The UI must look beautiful and professional."""
     
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -76,8 +93,8 @@ Generate clean, modern, responsive code following React best practices."""
                 response = self.call_llm(
                     prompt=frontend_prompt,
                     json_mode=True,
-                    temperature=0.1,
-                    max_tokens=1800
+                    temperature=0.2,
+                    max_tokens=4000  # full budget for complete UI files
                 )
                 
                 # Parse JSON
@@ -140,42 +157,36 @@ Generate clean, modern, responsive code following React best practices."""
             for f in features
         ])
         
-        return f"""Generate a complete React frontend application.
+        return f"""Generate a COMPLETE, beautiful React + TypeScript frontend application.
 
 Project: {plan['project_name']}
+Description: {plan.get('description', '')}
 Framework: {tech_stack['framework']}
 Language: {tech_stack['language']}
+Styling: Tailwind CSS
 
-Key Features:
+Key Features to implement UI for:
 {features_summary}
 
-Generate these essential files (keep each file under 40 lines):
-1. src/App.tsx - Main React component with routing
-2. src/pages/Home.tsx - Home page component with professional design
-3. src/pages/Login.tsx - Login page component
-4. src/services/api.ts - API service (MUST use: const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api')
-5. package.json - NPM dependencies with "dev", "build", "preview" scripts
-6. vite.config.ts - Vite configuration
-7. index.html - HTML entry point
-8. main.tsx - React entry point
+Generate ALL files in the FILE STRUCTURE listed in your system prompt.
 
-CRITICAL REQUIREMENTS:
-- api.ts MUST point to http://localhost:8000/api (NOT example.com)
-- MUST include complete build setup (package.json scripts, vite.config.ts, tsconfig.json, index.html, main.tsx)
-- Use professional UI design with Tailwind CSS:
-  * Modern color scheme (blue-600 primary, gray-50 backgrounds)
-  * Proper spacing (px-4, py-2, gap-4, etc.)
-  * Card layouts with shadows (bg-white, rounded-lg, shadow)
-  * Hover effects (hover:bg-blue-700, hover:underline)
-  * Responsive containers (container mx-auto, max-w-md)
-- Use TypeScript with proper types
-- Use React Router for navigation
-- Use Axios for API calls with interceptors
-- Modern React with hooks
-- Keep code concise (max 40 lines per file)
-- Focus on core functionality
+DESIGN REQUIREMENTS (mandatory):
+- Home page: Gradient hero section (from-slate-900 to-indigo-900), large white heading, subtext in gray-300, two CTA buttons (gradient primary + outline secondary), feature cards section with icons
+- Navbar: Glass effect or white with shadow, project name on left, nav links on right, conditional auth buttons
+- Dashboard: Clean white card layout, creation form at top, item cards with hover lift, empty state with emoji + description, status badges
+- Login/Register: Centered card, clean form inputs with focus rings, gradient submit button, link to other auth page
+- Colors: Use indigo/violet palette (indigo-600, violet-600) not plain blue
+- Buttons: bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700
 
-Output ONLY valid JSON with "files" key. Keep total response under 1500 tokens."""
+API REQUIREMENTS:
+- api.ts: const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+- Axios interceptors for Bearer token auth
+- Typed response interfaces
+- Methods: login, register, get{features[0]['name'].replace(' ', '') if features else 'Items'}s, create, update, delete
+
+Output ONLY valid JSON with \"files\" key mapping filename to complete file content.
+
+IMPORTANT: Generate COMPLETE code — do not truncate or abbreviate any file."""
     
     def _generate_fallback_frontend(self, architecture: Dict, plan: Dict) -> Dict[str, Any]:
         """
