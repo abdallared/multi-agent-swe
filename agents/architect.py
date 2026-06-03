@@ -25,7 +25,7 @@ ARCHITECTURE STANDARDS:
 2. ALWAYS use React + TypeScript + Tailwind CSS for the frontend
 3. Design a COMPLETE database schema — every entity mentioned in the plan gets a table
 4. Every table MUST have: id (INTEGER PRIMARY KEY), created_at (DATETIME), and appropriate columns
-5. Define relationships (foreign keys) between tables explicitly
+5. Define relationships (foreign keys) between tables explicitly. Ensure all database columns use standard snake_case (e.g., user_id, workspace_id) and specify relational integrity constraints.
 6. Design ALL necessary API endpoints — include auth endpoints + full CRUD for each resource
 7. Group modules logically: auth, each resource type, shared utilities
 

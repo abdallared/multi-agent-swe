@@ -39,6 +39,8 @@ CODE QUALITY STANDARDS:
 6. Use Pydantic v2 models for request/response validation
 7. Include CORS middleware in main.py
 8. Database session management: always use get_db() dependency injection
+9. Models initialization: Ensure any new model is imported inside the models package `__init__.py` file so that `Base.metadata.create_all` registers the model tables upon application startup.
+10. Table relationship matching: Match database keys correctly and implement parent-child tables (like workspaces and tasks) with standard foreign keys, cascade delete-orphan, and relationships mapped on both sides.
 
 FILE STRUCTURE (generate ALL of these):
 - app/__init__.py (empty)

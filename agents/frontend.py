@@ -41,6 +41,12 @@ CODE QUALITY STANDARDS:
 6. Use Axios with request interceptors for auth headers
 7. Error states: show user-friendly error messages in colored alert boxes
 8. All forms: loading state on submit button, disable while loading
+9. FastAPI returns JWT token under `response.data.access_token` (not `token`). Always save it as `access_token` from the login/register response.
+10. Do NOT evaluate authentication status statically in `App.tsx` component body (e.g., `const isAuthenticated = ...`). Instead, use dynamic route guards/wrappers (like `<ProtectedRoute>` and `<PublicRoute>` helper components) that dynamically retrieve `localStorage.getItem('token')` inside their render function to ensure route protection updates reactively upon login or logout without a page refresh.
+11. Navbar.tsx must subscribe to route updates by calling `useLocation()` from `react-router-dom` to ensure navigation dynamically updates the displayed links. Use `useNavigate()` to perform programmatically driven logouts.
+12. To prevent "state updates on unmounted components" warnings, do NOT call `setLoading(false)` inside `finally` blocks for API requests that trigger a redirect (e.g., login or registration). Only call `setLoading(false)` in the `catch` block.
+13. Match all interface property names to the snake_case properties returned by the SQLAlchemy/FastAPI backend (e.g. use `workspace_id` instead of `workspaceId`).
+14. Implement real CRUD logic in pages. Do not use setTimeout simulation wrappers or mock arrays for CRUD endpoints if they are specified in the backend design.
 
 FILE STRUCTURE (generate ALL of these):
 - src/main.tsx
@@ -226,18 +232,26 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Navbar from './components/Navbar';
 
+const ProtectedRoute = ({{ children }}: {{ children: React.ReactNode }}) => {{
+  const token = localStorage.getItem('token');
+  return token ? <>{{children}}</> : <Navigate to="/login" replace />;
+}};
+
+const PublicRoute = ({{ children }}: {{ children: React.ReactNode }}) => {{
+  const token = localStorage.getItem('token');
+  return !token ? <>{{children}}</> : <Navigate to="/dashboard" replace />;
+}};
+
 function App() {{
-  const isAuthenticated = !!localStorage.getItem('token');
-  
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-gray-50">
         <Navbar />
         <Routes>
-          <Route path="/" element={{<Home />}} />
-          <Route path="/login" element={{<Login />}} />
-          <Route path="/register" element={{<Register />}} />
-          <Route path="/dashboard" element={{isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}} />
+          <Route path="/" element={{<PublicRoute><Home /></PublicRoute>}} />
+          <Route path="/login" element={{<PublicRoute><Login /></PublicRoute>}} />
+          <Route path="/register" element={{<PublicRoute><Register /></PublicRoute>}} />
+          <Route path="/dashboard" element={{<ProtectedRoute><Dashboard /></ProtectedRoute>}} />
         </Routes>
       </div>
     </BrowserRouter>
@@ -262,10 +276,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 @tailwind utilities;
 ''',
             "src/components/Navbar.tsx": f'''import React from 'react';
-import {{ Link, useNavigate }} from 'react-router-dom';
+import {{ Link, useNavigate, useLocation }} from 'react-router-dom';
 
 const Navbar: React.FC = () => {{
   const navigate = useNavigate();
+  const location = useLocation();
   const isAuthenticated = !!localStorage.getItem('token');
 
   const handleLogout = () => {{
@@ -375,7 +390,6 @@ const Login: React.FC = () => {
       navigate('/dashboard');
     } catch {
       setError('Invalid username or password');
-    } finally {
       setLoading(false);
     }
   };
@@ -442,7 +456,6 @@ const Register: React.FC = () => {
       navigate('/login');
     } catch {
       setError('Registration failed. Username or email may already be taken.');
-    } finally {
       setLoading(false);
     }
   };

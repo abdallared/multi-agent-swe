@@ -2,8 +2,13 @@
 Configuration Module
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+from pathlib import Path
+
+# Find the repository root directory (where .env lives)
+ROOT_DIR = Path(__file__).resolve().parent.parent
+ENV_FILE_PATH = ROOT_DIR / ".env"
 
 class Settings(BaseSettings):
     """
@@ -31,9 +36,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_file: str = "./logs/app.log"
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE_PATH),
+        case_sensitive=False
+    )
 
 # Singleton
 settings = Settings()

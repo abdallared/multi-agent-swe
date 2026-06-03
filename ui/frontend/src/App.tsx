@@ -42,11 +42,11 @@ interface VerboseLog {
 const PHASES: PhaseInfo[] = [
   { num: 1, name: 'Planning',      icon: '◎', status: 'pending' },
   { num: 2, name: 'Architecture',  icon: '◎', status: 'pending' },
-  { num: 3, name: 'Backend',       icon: '◎', status: 'pending' },
-  { num: 4, name: 'Frontend',      icon: '◎', status: 'pending' },
-  { num: 5, name: 'Testing',       icon: '◎', status: 'pending' },
-  { num: 6, name: 'Docker',        icon: '◎', status: 'pending' },
-  { num: 7, name: 'Building',      icon: '◎', status: 'pending' },
+  { num: 3, name: 'Backend Code',  icon: '◎', status: 'pending' },
+  { num: 4, name: 'File Building', icon: '◎', status: 'pending' },
+  { num: 5, name: 'Frontend Code', icon: '◎', status: 'pending' },
+  { num: 6, name: 'Testing',       icon: '◎', status: 'pending' },
+  { num: 7, name: 'Docker',        icon: '◎', status: 'pending' },
 ];
 
 // ─── File Icon helper ────────────────────────────────────────────

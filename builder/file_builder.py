@@ -40,6 +40,9 @@ class FileBuilder:
         # إنشاء المجلدات الأساسية
         self._create_base_structure(project_dir, architecture)
         
+        # إنشاء ملف التشغيل التلقائي (run.bat)
+        self.create_run_bat(project_dir)
+        
         return project_dir
     
     def _create_base_structure(self, project_dir: Path, architecture: Dict):
@@ -73,6 +76,90 @@ class FileBuilder:
         (project_dir / "docker").mkdir(exist_ok=True)
         
         logger.info("Base structure created")
+
+    def create_run_bat(self, project_dir: Path):
+        """
+        إنشاء ملف run.bat لتشغيل المشروع بسهولة على ويندوز بدون دوجر
+        """
+        bat_content = """@echo off
+title Project Runner
+echo =======================================================================
+echo              Starting Project Setup and Runner (No Docker)
+echo =======================================================================
+echo.
+
+:: Check Python
+python --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Python is not installed or not in PATH. Please install Python.
+    pause
+    exit /b 1
+)
+
+:: Check Node
+node --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Node.js is not installed or not in PATH. Please install Node.js.
+    pause
+    exit /b 1
+)
+
+echo [1/4] Setting up Python virtual environment...
+if not exist "backend\\venv" (
+    python -m venv backend\\venv
+)
+
+echo [2/4] Installing backend dependencies...
+cd backend
+if not exist ".env" (
+    if exist ".env.example" (
+        copy .env.example .env
+    )
+)
+call venv\\Scripts\\activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+cd ..
+
+echo [3/4] Installing frontend dependencies (this may take a minute)...
+cd frontend
+if not exist ".env" (
+    if exist ".env.example" (
+        copy .env.example .env
+    )
+)
+if not exist "node_modules" (
+    call npm install
+)
+cd ..
+
+echo [4/4] Starting servers...
+echo.
+echo Launching Backend Server in a new window...
+start "Backend Server" cmd /k "cd backend && call venv\\Scripts\\activate && uvicorn app.main:app --port 8001 --reload"
+
+echo Launching Frontend Server in a new window...
+:: Detect starting command (Vite vs CRA)
+if exist "frontend\\vite.config.ts" (
+    set START_CMD=npm run dev
+) else if exist "frontend\\vite.config.js" (
+    set START_CMD=npm run dev
+) else (
+    set START_CMD=npm start
+)
+
+start "Frontend Server" cmd /k "cd frontend && set PORT=3001 && set BROWSER=none && set NODE_OPTIONS=--openssl-legacy-provider && %START_CMD%"
+
+echo.
+echo =======================================================================
+echo  Project is starting up!
+echo  - Backend: http://127.0.0.1:8001
+echo  - Frontend: http://localhost:3001
+echo =======================================================================
+echo.
+pause
+"""
+        self.write_file(project_dir / "run.bat", bat_content)
     
     def write_file(self, filepath: Path, content: str):
         """
