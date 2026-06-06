@@ -1,5 +1,5 @@
 import os
-from langchain.tools import tool
+from crewai.tools import tool
 
 @tool("Read file contents")
 def read_file(file_path: str) -> str:

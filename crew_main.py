@@ -1,7 +1,11 @@
 import sys
+import io
 import warnings
 from core.crew_pipeline import CrewPipeline
 from core.config import settings
+
+# Force UTF-8 encoding for Windows terminal
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # Suppress some langchain warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)

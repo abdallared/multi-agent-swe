@@ -1,14 +1,13 @@
 import os
-from langchain.tools import tool
-from langchain_community.tools import DuckDuckGoSearchRun
+from crewai.tools import tool
+from duckduckgo_search import DDGS
 
 @tool("Search the internet")
 def search_internet(query: str) -> str:
     """Useful to search the internet about a given topic and return relevant results."""
     print(f"\n[Tool] Searching the internet for: {query}")
     try:
-        search = DuckDuckGoSearchRun()
-        result = search.run(query)
-        return result
+        results = DDGS().text(query, max_results=3)
+        return str(list(results))
     except Exception as e:
         return f"Error performing search: {e}"

@@ -4,13 +4,13 @@
 # ============================================================
 
 # Core
-python-dotenv==1.0.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
 
 # HTTP (for Ollama API calls)
-requests==2.31.0
-httpx==0.26.0
+requests>=2.31.0
+httpx>=0.26.0
 
 # Web UI Backend
 fastapi==0.108.0
@@ -24,7 +24,7 @@ passlib[bcrypt]==1.7.4
 cryptography==41.0.7
 
 # Database (used in generated projects)
-sqlalchemy==2.0.25
+sqlalchemy>=2.0.25
 
 # Data utilities
 pyyaml==6.0.1
@@ -38,10 +38,10 @@ pytest-cov==4.1.0
 coverage==7.4.0
 
 # Memory System (optional — falls back to JSON store if not installed)
-chromadb==0.4.22
+chromadb>=0.4.22
 
 # Multi-Agent Framework (Phase 7 - CrewAI Integration)
 crewai>=0.28.8
 langchain-community>=0.0.34
+langchain-ollama>=0.2.0
 duckduckgo-search>=5.3.0
-

@@ -1,6 +1,5 @@
 import os
-from crewai import Agent
-from langchain_community.chat_models import ChatOllama
+from crewai import Agent, LLM
 from tools.search_tools import search_internet
 from tools.file_tools import read_file
 from core.config import settings
@@ -8,15 +7,15 @@ from core.config import settings
 class SoftwareEngineeringCrewAgents():
 
     def __init__(self):
-        # We use ChatOllama to connect CrewAI to our local Ollama models
-        self.planner_llm = ChatOllama(
-            model=settings.planner_model,
+        # We use CrewAI's native LLM wrapper for Ollama
+        self.planner_llm = LLM(
+            model=f"ollama/{settings.planner_model}",
             base_url=settings.ollama_base_url,
             temperature=0.7
         )
         
-        self.coder_llm = ChatOllama(
-            model=settings.backend_model,
+        self.coder_llm = LLM(
+            model=f"ollama/{settings.backend_model}",
             base_url=settings.ollama_base_url,
             temperature=0.1
         )
