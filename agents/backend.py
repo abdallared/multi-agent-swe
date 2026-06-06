@@ -4,6 +4,7 @@ Backend Agent - توليد كود Backend
 
 from agents.base_agent import BaseAgent
 from typing import Dict, Any
+from utils.code_validator import CodeValidator
 import json
 import logging
 
@@ -68,7 +69,7 @@ Generate COMPLETE files with ALL code — do not truncate or use ellipsis."""
     
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        تنفيذ توليد كود Backend مع retry logic
+        تنفيذ توليد كود Backend مع retry logic + code validation
         """
         architecture = context.get('architecture')
         plan = context.get('project_plan')
@@ -80,6 +81,7 @@ Generate COMPLETE files with ALL code — do not truncate or use ellipsis."""
         
         # بناء الـ prompt
         backend_prompt = self._build_backend_prompt(architecture, plan)
+        validator = CodeValidator()
         
         # Retry logic
         max_retries = 3
@@ -92,36 +94,64 @@ Generate COMPLETE files with ALL code — do not truncate or use ellipsis."""
                     prompt=backend_prompt,
                     json_mode=True,
                     temperature=0.1,
-                    max_tokens=4000  # full budget for complete files
+                    max_tokens=4000
                 )
                 
                 # Parse JSON
                 backend_code = self._parse_json_response(response)
                 
-                # Validation
+                # Basic validation
                 if 'files' not in backend_code:
                     raise ValueError("Backend code must include 'files' key")
                 
                 if len(backend_code['files']) < 3:
                     raise ValueError(f"Expected at least 3 files, got {len(backend_code['files'])}")
                 
-                self.logger.info(f"✅ Generated {len(backend_code['files'])} backend files")
+                # ── Code Validation ─────────────────────────────
+                report = validator.validate_backend_files(
+                    backend_code['files'],
+                    architecture=architecture,
+                )
+                
+                if report.critical_count > 0 and attempt < max_retries - 1:
+                    # Self-correction: re-call LLM with fix instructions
+                    self.logger.warning(
+                        f"Validation found {report.critical_count} critical issues, attempting self-correction..."
+                    )
+                    self._emit_verbose("info", f"Code validation found issues, attempting fix...\n{report.summary()}")
+                    backend_prompt = self._build_fix_prompt(backend_prompt, report)
+                    continue
+                
+                if report.warning_count > 0:
+                    self.logger.warning(f"Validation warnings: {report.summary()}")
+                
+                self.logger.info(f"✅ Generated {len(backend_code['files'])} backend files (validation: {'passed' if report.is_valid else 'warnings'})")
                 
                 return {
                     'backend_code': backend_code,
-                    'status': 'backend_completed'
+                    'status': 'backend_completed',
+                    'validation': report.summary(),
                 }
                 
             except (json.JSONDecodeError, ValueError) as e:
                 self.logger.warning(f"Attempt {attempt + 1} failed: {e}")
                 if attempt == max_retries - 1:
-                    # آخر محاولة - استخدم fallback
                     self.logger.warning("Using fallback code generation")
                     return self._generate_fallback_backend(architecture, plan)
                 continue
         
         raise RuntimeError("Failed to generate backend code after all retries")
-    
+
+    def _build_fix_prompt(self, original_prompt: str, report) -> str:
+        """Build a prompt that includes validation issues for self-correction."""
+        issues_text = report.to_prompt_text()
+        return f"""{original_prompt}
+
+IMPORTANT: Your previous output had the following issues that MUST be fixed:
+{issues_text}
+
+Please regenerate the code with ALL issues fixed. Output ONLY valid JSON."""
+
     def _build_backend_prompt(self, architecture: Dict, plan: Dict) -> str:
         """
         بناء prompt لتوليد Backend

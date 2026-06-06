@@ -4,6 +4,7 @@ Frontend Agent - توليد كود Frontend
 
 from agents.base_agent import BaseAgent
 from typing import Dict, Any
+from utils.code_validator import CodeValidator
 import json
 import logging
 
@@ -76,7 +77,7 @@ Generate COMPLETE files — never truncate. The UI must look beautiful and profe
     
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
-        تنفيذ توليد كود Frontend مع retry logic
+        تنفيذ توليد كود Frontend مع retry logic + code validation
         """
         architecture = context.get('architecture')
         plan = context.get('project_plan')
@@ -88,6 +89,7 @@ Generate COMPLETE files — never truncate. The UI must look beautiful and profe
         
         # بناء الـ prompt
         frontend_prompt = self._build_frontend_prompt(architecture, plan)
+        validator = CodeValidator()
         
         # Retry logic
         max_retries = 3
@@ -100,24 +102,31 @@ Generate COMPLETE files — never truncate. The UI must look beautiful and profe
                     prompt=frontend_prompt,
                     json_mode=True,
                     temperature=0.2,
-                    max_tokens=4000  # full budget for complete UI files
+                    max_tokens=4000
                 )
                 
                 # Parse JSON
                 frontend_code = self._parse_json_response(response)
                 
-                # Validation
+                # Basic validation
                 if 'files' not in frontend_code:
                     raise ValueError("Frontend code must include 'files' key")
                 
                 if len(frontend_code['files']) < 3:
                     raise ValueError(f"Expected at least 3 files, got {len(frontend_code['files'])}")
                 
+                # ── Frontend Code Validation ─────────────────────
+                report = validator.validate_frontend_files(frontend_code['files'])
+                
+                if report.warning_count > 0:
+                    self.logger.warning(f"Frontend validation warnings: {report.summary()}")
+                
                 self.logger.info(f"✅ Generated {len(frontend_code['files'])} frontend files")
                 
                 return {
                     'frontend_code': frontend_code,
-                    'status': 'frontend_completed'
+                    'status': 'frontend_completed',
+                    'validation': report.summary(),
                 }
                 
             except (json.JSONDecodeError, ValueError) as e:

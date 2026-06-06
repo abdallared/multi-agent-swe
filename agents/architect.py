@@ -230,7 +230,13 @@ Output ONLY valid JSON, no additional text."""
             for f in plan.get('features', [])
         ])
         
-        nfr = plan.get('non_functional_requirements', {})
+        nfr_raw = plan.get('non_functional_requirements', {})
+        if isinstance(nfr_raw, list) and len(nfr_raw) > 0:
+            nfr = nfr_raw[0] if isinstance(nfr_raw[0], dict) else {}
+        elif isinstance(nfr_raw, dict):
+            nfr = nfr_raw
+        else:
+            nfr = {}
         
         return f"""Design a complete system architecture for this project:
 

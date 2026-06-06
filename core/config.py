@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     testing_model: str = "llama3.2:3b"
     debugger_model: str = "llama3.1:8b"
     refactor_model: str = "qwen2.5-coder:7b"
+    reviewer_model: str = "qwen2.5-coder:7b"
     devops_model: str = "llama3.2:3b"
     embeddings_model: str = "nomic-embed-text:latest"
     

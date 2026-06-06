@@ -1,0 +1,535 @@
+# 🚀 خطة تحسين أداء Multi-Agent SWE System
+
+تحسين شامل لأداء وجودة النظام — من البنية التحتية (Ollama Interface) وصولاً لإضافة agents جديدة وذاكرة فعلية.
+
+## User Review Required
+
+> [!IMPORTANT]
+> الخطة مقسمة لـ 6 مراحل مستقلة. كل مرحلة ممكن تتنفذ لوحدها. هل تفضل ننفذ كل المراحل ولا نبدأ بمراحل معينة؟
+
+> [!WARNING]
+> **المرحلة 1 (Ollama Interface)** هي الأساس — باقي المراحل بتعتمد عليها. لازم تتنفذ الأول.
+
+> [!CAUTION]
+> المرحلة 6 (Memory System) بتحتاج `chromadb` كـ dependency جديد (~500MB). ممكن نأجلها لو الحجم مشكلة.
+
+## Open Questions
+
+> [!IMPORTANT]
+> 1. **LangChain vs Custom**: هل تفضل استخدام LangChain/LangGraph كـ framework ولا نبني الـ orchestration logic بكود خفيف (lightweight custom)؟ الاقتراح: **custom** لأنك بتستخدم Ollama محلي و LangChain هيضيف overhead.
+> 2. **Async everywhere**: تحويل الـ agents كلها لـ async هيأثر على الـ CLI mode في `main.py`. هل الـ Web UI هو الأولوية ولا الـ CLI كمان مهم؟
+> 3. **Review Agent strictness**: الـ Review Agent يكون strict (يرفض كود مش كامل ويعيد التوليد) ولا lenient (يحاول يصلح الكود بنفسه)؟
+
+---
+
+## المرحلة 1: تحسين Ollama Interface (الأساس)
+
+**الهدف**: تحويل الـ Ollama Interface من synchronous بسيط إلى async مع streaming, caching, retry, و connection pooling.
+
+**التأثير**: أسرع ~30% + UX أحسن (progress bars) + reliability أعلى (auto-retry)
+
+---
+
+### Ollama Interface
+
+#### [MODIFY] [ollama_interface.py](file:///d:/multi-agent-swe/utils/ollama_interface.py)
+
+**التغييرات الرئيسية:**
+
+1. **استبدال `requests` بـ `httpx.AsyncClient`** مع connection pooling:
+   ```python
+   # قبل
+   response = requests.post(f"{self.base_url}/api/chat", json=payload, timeout=600)
+   
+   # بعد
+   async with httpx.AsyncClient() as client:
+       response = await client.post(f"{self.base_url}/api/chat", json=payload, timeout=600)
+   ```
+
+2. **إضافة Streaming support** — بدل ما نستنى الـ response كله:
+   ```python
+   async def generate_stream(self, prompt, agent_type, ...):
+       payload["stream"] = True
+       async with httpx.AsyncClient() as client:
+           async with client.stream("POST", url, json=payload) as response:
+               async for line in response.aiter_lines():
+                   chunk = json.loads(line)
+                   yield chunk["message"]["content"]
+   ```
+
+3. **Response Caching** — باستخدام hash للـ prompt:
+   ```python
+   import hashlib
+   
+   class ResponseCache:
+       def __init__(self, max_size=50):
+           self._cache = {}
+       
+       def get(self, prompt_hash): ...
+       def set(self, prompt_hash, response): ...
+   ```
+
+4. **Retry مع Exponential Backoff** — باستخدام `tenacity` (موجودة في requirements بس مش مستخدمة!):
+   ```python
+   from tenacity import retry, stop_after_attempt, wait_exponential
+   
+   @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=30))
+   async def generate(self, ...):
+       ...
+   ```
+
+5. **الاحتفاظ بـ `generate()` synchronous** كـ backward-compatible wrapper:
+   ```python
+   def generate(self, ...):
+       """Sync wrapper for backward compatibility with CLI"""
+       return asyncio.run(self.agenerate(...))
+   ```
+
+#### [NEW] [utils/cache.py](file:///d:/multi-agent-swe/utils/cache.py)
+
+LRU cache module للـ LLM responses:
+- `ResponseCache` class مع TTL (time-to-live)
+- Hash function للـ prompts
+- Max size limit (50 entries default)
+- Thread-safe implementation
+
+---
+
+## المرحلة 2: تشغيل Agents بالتوازي
+
+**الهدف**: بعد الـ Architect يخلص، الـ Backend + Frontend يشتغلوا بالتوازي. وبعدهم الـ Testing + Docker بالتوازي.
+
+**التأثير**: ~40-50% وقت أقل للتوليد الكامل
+
+```
+Sequential (الحالي):   Plan → Arch → Backend → Build → Frontend → Test → Docker
+                       ──────────────────────────────────────────────────────────→ ~20 min
+
+Parallel (المقترح):    Plan → Arch → ┬─ Backend ─┬─ Build → ┬─ Test   ─┬→ Done
+                                      └─ Frontend ┘          └─ Docker  ┘
+                       ──────────────────────────────────────────────→ ~12 min
+```
+
+---
+
+### Pipeline Orchestrator (جديد)
+
+#### [NEW] [core/pipeline.py](file:///d:/multi-agent-swe/core/pipeline.py)
+
+Orchestrator class بيدير تنفيذ الـ agents:
+
+```python
+class Pipeline:
+    """Manages agent execution order with parallel support"""
+    
+    async def run(self, user_prompt: str, on_update=None) -> dict:
+        # Phase 1-2: Sequential (Plan → Architect)
+        plan = await self._run_agent(PlannerAgent, {...})
+        arch = await self._run_agent(ArchitectAgent, {...})
+        
+        # Phase 3: Parallel (Backend + Frontend)
+        backend_result, frontend_result = await asyncio.gather(
+            self._run_agent(BackendAgent, {plan, arch}),
+            self._run_agent(FrontendAgent, {plan, arch}),
+        )
+        
+        # Phase 4: Build files
+        self._build_files(backend_result, frontend_result)
+        
+        # Phase 5: Parallel (Testing + Docker)
+        test_result, docker_result = await asyncio.gather(
+            self._run_agent(TestingAgent, {...}),
+            self._run_agent(DockerAgent, {...}),
+        )
+        
+        return combined_result
+```
+
+**ملاحظة**: الـ Frontend Agent حالياً مش بيعتمد على ناتج الـ Backend Agent — كل واحد بياخد `plan` + `architecture` بس. ده اللي بيخلي التوازي ممكن.
+
+#### [MODIFY] [main.py](file:///d:/multi-agent-swe/main.py)
+
+- استبدال الـ sequential calls بـ `Pipeline.run()`
+- الاحتفاظ بالـ CLI interface كما هو
+- إضافة `asyncio.run()` wrapper
+
+#### [MODIFY] [ui/backend/app.py](file:///d:/multi-agent-swe/ui/backend/app.py)
+
+- استبدال الـ sequential calls في `ProjectGenerator.generate_project()` بـ `Pipeline.run()`
+- الـ `on_update` callback هيبعت الـ WebSocket updates
+- الـ verbose callback يفضل شغال كما هو
+
+---
+
+## المرحلة 3: نظام التحقق التلقائي من الكود (Auto-Validation)
+
+**الهدف**: فحص الكود المُولّد قبل كتابته للملفات — كشف syntax errors, missing imports, schema mismatches.
+
+**التأثير**: جودة الكود المُولّد أعلى بكتير — تقليل الأخطاء بـ ~70%
+
+---
+
+#### [NEW] [utils/code_validator.py](file:///d:/multi-agent-swe/utils/code_validator.py)
+
+```python
+class CodeValidator:
+    """Validates generated code before writing to files"""
+    
+    def validate_python_file(self, filename: str, code: str) -> ValidationResult:
+        """Parse Python AST to detect syntax errors"""
+        try:
+            ast.parse(code)
+            return ValidationResult(valid=True)
+        except SyntaxError as e:
+            return ValidationResult(valid=False, error=str(e), line=e.lineno)
+    
+    def validate_imports(self, code: str) -> list[str]:
+        """Check for common missing imports in generated code"""
+        tree = ast.parse(code)
+        # Analyze imports vs usage
+        ...
+    
+    def validate_schema_consistency(
+        self, 
+        architecture: dict,
+        backend_files: dict
+    ) -> list[str]:
+        """Verify DB tables in architecture match generated models"""
+        # Extract table names from architecture
+        # Extract __tablename__ from generated models
+        # Report mismatches
+        ...
+    
+    def validate_all(self, files: dict, architecture: dict) -> ValidationReport:
+        """Run all validations on generated files"""
+        report = ValidationReport()
+        for filename, code in files.items():
+            if filename.endswith('.py'):
+                result = self.validate_python_file(filename, code)
+                if not result.valid:
+                    report.add_error(filename, result)
+        return report
+```
+
+#### [MODIFY] [agents/backend.py](file:///d:/multi-agent-swe/agents/backend.py)
+
+- بعد الـ JSON parsing وقبل الـ return، يعمل `CodeValidator.validate_all()`
+- لو فيه errors → يعيد الـ LLM call مع الـ errors في الـ prompt (self-correction)
+- Max 2 correction attempts قبل الـ fallback
+
+#### [MODIFY] [agents/frontend.py](file:///d:/multi-agent-swe/agents/frontend.py)
+
+- نفس الفكرة بس للـ TypeScript/JSX files
+- Validation أبسط (no AST) — بس نتأكد من:
+  - `import.meta.env.VITE_API_URL` موجود
+  - كل component معمولها `export default`
+  - مفيش `TODO` أو `...` placeholders
+
+#### [MODIFY] [builder/file_builder.py](file:///d:/multi-agent-swe/builder/file_builder.py)
+
+- إضافة validation step قبل `write_files()`
+- Log warnings لأي ملفات فيها مشاكل
+
+---
+
+## المرحلة 4: إدارة ديناميكية للـ Tokens
+
+**الهدف**: بدل `max_tokens=4000` ثابت، يبقى dynamic بناءً على complexity + agent type.
+
+**التأثير**: مشاريع معقدة تتولد كاملة بدون truncation
+
+---
+
+#### [NEW] [utils/token_manager.py](file:///d:/multi-agent-swe/utils/token_manager.py)
+
+```python
+class TokenManager:
+    """Dynamically calculates optimal token budget per agent"""
+    
+    # Base budgets per agent type
+    BASE_BUDGETS = {
+        "planner": 2000,
+        "architect": 4000,
+        "backend": 6000,
+        "frontend": 8000,
+        "testing": 3000,
+        "docker": 2000,
+    }
+    
+    # Complexity multipliers
+    MULTIPLIERS = {
+        "simple": 1.0,
+        "medium": 1.5,
+        "complex": 2.0,
+    }
+    
+    def get_budget(self, agent_type: str, complexity: str = "medium") -> int:
+        base = self.BASE_BUDGETS.get(agent_type, 4000)
+        multiplier = self.MULTIPLIERS.get(complexity, 1.0)
+        return int(base * multiplier)
+    
+    def get_temperature(self, agent_type: str) -> float:
+        """Agent-specific temperature defaults"""
+        temps = {
+            "planner": 0.7,    # creative
+            "architect": 0.1,  # deterministic
+            "backend": 0.1,    # precise code
+            "frontend": 0.2,   # slightly creative for UI
+            "testing": 0.1,    # precise tests
+        }
+        return temps.get(agent_type, 0.3)
+```
+
+#### [MODIFY] [agents/base_agent.py](file:///d:/multi-agent-swe/agents/base_agent.py)
+
+- الـ `call_llm()` يستخدم `TokenManager` لو `max_tokens` مش مُحدد explicitly
+- إضافة `self.complexity` attribute يتضبط من الـ context
+
+#### [MODIFY] [agents/architect.py](file:///d:/multi-agent-swe/agents/architect.py)
+
+- الـ `_analyze_complexity()` يحفظ النتيجة في الـ context عشان باقي الـ agents يستخدموها
+- الـ complexity score يُمرر في الـ return dict
+
+---
+
+## المرحلة 5: Review Agent + Self-Correction Loop
+
+**الهدف**: agent جديد يراجع الكود المُولّد ويصلح المشاكل — أهم تحسين للجودة.
+
+**التأثير**: جودة الكود تزيد بشكل كبير — مشاريع بتشتغل من أول مرة
+
+---
+
+#### [NEW] [agents/reviewer.py](file:///d:/multi-agent-swe/agents/reviewer.py)
+
+```python
+class ReviewerAgent(BaseAgent):
+    """Reviews generated code and provides fix instructions"""
+    
+    def get_system_prompt(self) -> str:
+        return """You are a senior code reviewer. Review generated FastAPI + React code.
+        
+        Check for:
+        1. Missing imports
+        2. Undefined variables
+        3. Inconsistent API endpoints (backend vs frontend)
+        4. Missing error handling
+        5. Security issues (plain text passwords, no auth on protected routes)
+        6. Database schema mismatches
+        
+        Output JSON:
+        {
+            "status": "pass" | "fail",
+            "issues": [
+                {
+                    "file": "app/api/auth.py",
+                    "severity": "critical" | "warning",
+                    "description": "Missing import for get_password_hash",
+                    "fix": "Add: from app.core.security import get_password_hash"
+                }
+            ]
+        }"""
+    
+    def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        # 1. Run CodeValidator (static analysis)
+        static_issues = self.validator.validate_all(...)
+        
+        # 2. Run LLM review (semantic analysis)
+        llm_review = self.call_llm(review_prompt)
+        
+        # 3. Combine results
+        if issues_found:
+            return {"status": "fail", "issues": combined_issues}
+        return {"status": "pass"}
+```
+
+#### [NEW] [core/fix_loop.py](file:///d:/multi-agent-swe/core/fix_loop.py)
+
+Self-correction loop logic:
+
+```python
+class FixLoop:
+    """Orchestrates the review → fix cycle"""
+    
+    MAX_ITERATIONS = 2
+    
+    async def run(self, agent, context, generated_code):
+        for i in range(self.MAX_ITERATIONS):
+            review = await reviewer.execute({...code, ...context})
+            
+            if review["status"] == "pass":
+                return generated_code  # ✅ Code is good
+            
+            # Re-generate with fix instructions
+            fix_prompt = self._build_fix_prompt(generated_code, review["issues"])
+            generated_code = await agent.execute({...context, "fix_instructions": fix_prompt})
+        
+        return generated_code  # Return best effort after max iterations
+```
+
+#### [MODIFY] [core/pipeline.py](file:///d:/multi-agent-swe/core/pipeline.py)
+
+- بعد الـ Backend + Frontend يخلصوا، يبعتهم للـ ReviewerAgent
+- لو الـ review failed → يدخل الـ FixLoop
+- الـ Pipeline flow الجديد:
+  ```
+  Plan → Arch → [Backend ∥ Frontend] → Review → (Fix Loop?) → Build → [Test ∥ Docker]
+  ```
+
+#### [MODIFY] [agents/__init__.py](file:///d:/multi-agent-swe/agents/__init__.py)
+
+- إضافة `ReviewerAgent` للـ exports
+
+#### [MODIFY] [core/config.py](file:///d:/multi-agent-swe/core/config.py)
+
+- إضافة `reviewer_model: str = "qwen2.5-coder:7b"` للـ Settings
+
+---
+
+## المرحلة 6: Memory System (اختياري)
+
+**الهدف**: ذاكرة طويلة المدى — النظام يتعلم من المشاريع السابقة ويحسّن الـ prompts.
+
+**التأثير**: جودة تتحسن مع الوقت — few-shot examples من مشاريع ناجحة سابقة
+
+> [!WARNING]
+> المرحلة دي بتحتاج `chromadb` (~500MB) أو `faiss-cpu` (~150MB). ممكن تتأجل.
+
+---
+
+#### [NEW] [memory/vector_store.py](file:///d:/multi-agent-swe/memory/vector_store.py)
+
+```python
+class VectorStore:
+    """Persistent vector memory using ChromaDB"""
+    
+    def __init__(self, persist_dir="./memory/db"):
+        self.client = chromadb.PersistentClient(path=persist_dir)
+        self.collection = self.client.get_or_create_collection("projects")
+    
+    def store_project(self, project_plan, architecture, quality_score):
+        """Store a successful project for future reference"""
+        ...
+    
+    def find_similar(self, user_prompt, top_k=3):
+        """Find similar past projects for few-shot prompting"""
+        ...
+```
+
+#### [NEW] [memory/project_memory.py](file:///d:/multi-agent-swe/memory/project_memory.py)
+
+Higher-level memory interface:
+- `save_successful_project()` — بعد ما مشروع ينجح
+- `get_similar_examples()` — يرجع أمثلة مشابهة
+- `get_common_patterns()` — patterns متكررة في مشاريع ناجحة
+
+#### [MODIFY] [memory/__init__.py](file:///d:/multi-agent-swe/memory/__init__.py)
+
+- استبدال الـ import الحالي (VectorMemory غير موجود) بالـ classes الجديدة
+
+#### [MODIFY] [agents/base_agent.py](file:///d:/multi-agent-swe/agents/base_agent.py)
+
+- الـ `call_llm()` يفحص الـ memory لو متاحة ويضيف few-shot examples للـ prompt
+
+---
+
+## ملخص الملفات
+
+### ملفات جديدة (7 ملفات)
+| الملف | المرحلة | الوصف |
+|-------|---------|-------|
+| [utils/cache.py](file:///d:/multi-agent-swe/utils/cache.py) | 1 | LLM response cache |
+| [core/pipeline.py](file:///d:/multi-agent-swe/core/pipeline.py) | 2 | Agent orchestrator مع parallel execution |
+| [utils/code_validator.py](file:///d:/multi-agent-swe/utils/code_validator.py) | 3 | Static code validation |
+| [utils/token_manager.py](file:///d:/multi-agent-swe/utils/token_manager.py) | 4 | Dynamic token budgets |
+| [agents/reviewer.py](file:///d:/multi-agent-swe/agents/reviewer.py) | 5 | Code review agent |
+| [core/fix_loop.py](file:///d:/multi-agent-swe/core/fix_loop.py) | 5 | Self-correction loop |
+| [memory/vector_store.py](file:///d:/multi-agent-swe/memory/vector_store.py) | 6 | Vector DB wrapper |
+
+### ملفات معدلة (10 ملفات)
+| الملف | المراحل | التغيير |
+|-------|---------|---------|
+| [ollama_interface.py](file:///d:/multi-agent-swe/utils/ollama_interface.py) | 1 | Async + streaming + retry |
+| [base_agent.py](file:///d:/multi-agent-swe/agents/base_agent.py) | 1, 4, 6 | Async call_llm + TokenManager + Memory |
+| [main.py](file:///d:/multi-agent-swe/main.py) | 2 | Pipeline integration |
+| [app.py](file:///d:/multi-agent-swe/ui/backend/app.py) | 2 | Pipeline integration |
+| [backend.py](file:///d:/multi-agent-swe/agents/backend.py) | 3 | Code validation before return |
+| [frontend.py](file:///d:/multi-agent-swe/agents/frontend.py) | 3 | Code validation before return |
+| [file_builder.py](file:///d:/multi-agent-swe/builder/file_builder.py) | 3 | Validation before write |
+| [architect.py](file:///d:/multi-agent-swe/agents/architect.py) | 4 | Complexity in return context |
+| [config.py](file:///d:/multi-agent-swe/core/config.py) | 5 | reviewer_model setting |
+| [__init__.py](file:///d:/multi-agent-swe/agents/__init__.py) | 5 | Export ReviewerAgent |
+
+### Dependencies جديدة
+```diff
+# requirements.txt
++ chromadb==0.4.22          # المرحلة 6 فقط (اختياري)
+  httpx==0.26.0             # موجود بالفعل ✅
+  tenacity==8.2.3           # موجود بالفعل ✅
+```
+
+---
+
+## Verification Plan
+
+### Automated Tests
+
+```bash
+# اختبار الـ cache
+python -m pytest tests/test_cache.py -v
+
+# اختبار الـ validator
+python -m pytest tests/test_validator.py -v
+
+# اختبار الـ pipeline
+python -m pytest tests/test_pipeline.py -v
+
+# اختبار النظام الكامل
+python -m pytest tests/test_full_system.py -v
+
+# اختبار الـ token manager
+python -m pytest tests/test_token_manager.py -v
+```
+
+### Manual Verification
+
+1. **المرحلة 1**: تشغيل `python main.py` والتأكد إن الـ retry والـ caching شغالين
+2. **المرحلة 2**: مقارنة وقت التوليد قبل وبعد (المتوقع ~40% أسرع)
+3. **المرحلة 3**: توليد مشروع والتحقق إن مفيش syntax errors
+4. **المرحلة 5**: توليد مشروع والتأكد إن الـ reviewer بيكشف مشاكل ويصلحها
+5. **Web UI**: تشغيل `ui/backend/app.py` والتأكد إن الـ WebSocket updates شغالة بالتوازي
+
+---
+
+## ترتيب التنفيذ المقترح
+
+```mermaid
+gantt
+    title خطة التنفيذ
+    dateFormat  X
+    axisFormat %s
+
+    section المرحلة 1
+    Ollama Interface (async + retry)     :a1, 0, 2
+    Response Cache                       :a2, 0, 1
+
+    section المرحلة 2
+    Pipeline Orchestrator                :b1, after a1, 2
+    main.py + app.py integration         :b2, after b1, 1
+
+    section المرحلة 3
+    Code Validator                       :c1, after a1, 2
+    Backend/Frontend integration         :c2, after c1, 1
+
+    section المرحلة 4
+    Token Manager                        :d1, after a1, 1
+    Base Agent integration               :d2, after d1, 1
+
+    section المرحلة 5
+    Review Agent                         :e1, after c1, 2
+    Fix Loop                             :e2, after e1, 1
+
+    section المرحلة 6
+    Vector Store                         :f1, after e2, 2
+    Memory integration                   :f2, after f1, 1
+```

@@ -83,23 +83,50 @@ Output ONLY valid JSON, no additional text."""
         # بناء الـ prompt
         planning_prompt = self._build_planning_prompt(user_prompt)
         
-        # استدعاء LLM
-        response = self.call_llm(
-            prompt=planning_prompt,
-            json_mode=True,
-            temperature=0.7
-        )
+        # Retry loop for generation and validation
+        max_attempts = 3
+        plan = None
+        current_prompt = planning_prompt
         
-        # Parse JSON
-        try:
-            plan = json.loads(response)
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to parse JSON: {e}")
-            self.logger.error(f"Response was: {response[:500]}")
-            raise
-        
-        # Validation
-        self._validate_plan(plan)
+        for attempt in range(max_attempts):
+            self.logger.info(f"Planning attempt {attempt + 1}/{max_attempts}")
+            
+            # استدعاء LLM
+            response = self.call_llm(
+                prompt=current_prompt,
+                json_mode=True,
+                temperature=0.7
+            )
+            
+            # Parse JSON
+            try:
+                plan = json.loads(response)
+                
+                # التأكد من أن النتيجة قاموس وليست قائمة لتفادي خطأ list has no attribute get
+                if not isinstance(plan, dict):
+                    raise ValueError(f"Expected JSON object (dict), but got {type(plan).__name__}")
+                
+                # Validation
+                self._validate_plan(plan)
+                
+                # If we succeed, break the retry loop
+                break
+                
+            except (json.JSONDecodeError, ValueError) as e:
+                self.logger.warning(f"Validation failed on attempt {attempt + 1}: {e}")
+                
+                if attempt == max_attempts - 1:
+                    self.logger.error(f"Failed to generate valid plan after {max_attempts} attempts.")
+                    self.logger.error(f"Last response was: {response[:500]}")
+                    raise
+                
+                # Prepare self-correction prompt for the next attempt
+                current_prompt = (
+                    f"Your previous response failed validation with this error:\n{str(e)}\n\n"
+                    f"Please fix the issues and return ONLY a valid JSON object matching the requested structure.\n"
+                    f"Do not return a JSON array (List) at the root level, it MUST be a JSON object (Dictionary).\n\n"
+                    f"Original Request:\n{user_prompt}"
+                )
         
         self.logger.info(f"Planning completed for: {plan.get('project_name', 'Unknown')}")
         
