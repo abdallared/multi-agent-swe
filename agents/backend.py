@@ -192,7 +192,7 @@ CRITICAL RULES:
 2. security.py: include verify_password(), get_password_hash(), create_access_token(), get_current_user()
 3. auth.py: use get_password_hash() for register, verify_password() for login, NEVER plain text
 4. All protected routes: use Depends(get_current_user) for authentication
-5. requirements.txt: pin exact versions (fastapi==0.104.1, uvicorn[standard]==0.24.0, sqlalchemy==2.0.23, pydantic==2.5.0, pydantic-settings==2.1.0, python-jose[cryptography]==3.3.0, passlib[bcrypt]==1.7.4, python-multipart==0.0.6, email-validator==2.1.0)
+5. requirements.txt: pin exact versions (fastapi==0.104.1, uvicorn[standard]==0.24.0, sqlalchemy==2.0.23, pydantic==2.5.0, pydantic-settings==2.1.0, python-jose[cryptography]==3.3.0, passlib[bcrypt]==1.7.4, bcrypt==4.0.1, python-multipart==0.0.6, email-validator==2.1.0)
 6. Include proper 404, 400, 401 HTTP exceptions
 7. main.py: CORS middleware with allow_origins=["*"], include all routers
 8. COMPLETE code only — no "# ... rest of code" or "# TODO" placeholders
@@ -413,9 +413,11 @@ router = APIRouter()
 
 @router.post("/register", response_model=UserSchema)
 def register(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
+    db_user = db.query(User).filter((User.email == user.email) | (User.username == user.username)).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        if db_user.email == user.email:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=400, detail="Username already registered")
     
     hashed_password = get_password_hash(user.password)
     db_user = User(email=user.email, username=user.username, hashed_password=hashed_password)
@@ -499,6 +501,7 @@ pydantic-settings==2.1.0
 python-dotenv==1.0.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 python-multipart==0.0.6
 email-validator==2.1.0
 pytest==7.4.3
