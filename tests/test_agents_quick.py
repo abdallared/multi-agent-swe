@@ -3,7 +3,7 @@ Quick Agent Test - no Ollama needed
 """
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.stdout.reconfigure(encoding='utf-8')
 
 plan = {
@@ -88,7 +88,7 @@ try:
     tests = t._get_fallback_tests(plan)
     assert len(tests) >= 3
     assert 'tests/conftest.py' in tests
-    assert 'tests/test_main.py' in tests
+    assert 'tests/test_auth.py' in tests
     assert 'tests/test_api.py' in tests
     print(f"  PASS - {len(tests)} test files generated")
     for f in tests:

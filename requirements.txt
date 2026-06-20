@@ -40,8 +40,9 @@ coverage==7.4.0
 # Memory System (optional — falls back to JSON store if not installed)
 chromadb>=0.4.22
 
-# Multi-Agent Framework (Phase 7 - CrewAI Integration)
+# Multi-Agent Framework (Phase 7 - CrewAI & LangGraph Integration)
 crewai>=0.28.8
+langgraph>=0.0.26
 langchain-community>=0.0.34
 langchain-ollama>=0.2.0
 duckduckgo-search>=5.3.0

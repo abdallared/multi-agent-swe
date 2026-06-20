@@ -6,7 +6,7 @@ import os
 import json
 import traceback
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def test_imports():
     """Test all imports work"""

@@ -2,7 +2,7 @@
 Phase 5 Verification Script — Review Agent + Self-Correction Loop
 """
 import sys
-sys.path.insert(0, '.')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def test_reviewer_import():
     from agents.reviewer import ReviewAgent
