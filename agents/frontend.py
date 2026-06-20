@@ -601,7 +601,7 @@ const Dashboard: React.FC = () => {{
       </form>
 
       <div className="space-y-4">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Your {Resource}s ({{{{resource}}.length}})</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Your {Resource}s ({{{resource}.length}})</h2>
         {{{resource}.length === 0 ? (
           <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-12 text-center">
             <div className="text-gray-400 text-5xl mb-4">📝</div>
@@ -609,7 +609,7 @@ const Dashboard: React.FC = () => {{
             <p className="text-gray-500">Create your first {resource_singular} using the form above</p>
           </div>
         ) : (
-          {{{resource}.map(item => (
+          {resource}.map(item => (
             <div key={{item.id}} 
               className="bg-white p-6 rounded-xl shadow-md border border-gray-100 hover:shadow-lg transition-shadow">
               <div className="flex justify-between items-start">
@@ -630,7 +630,7 @@ const Dashboard: React.FC = () => {{
                 </button>
               </div>
             </div>
-          ))}}
+          ))
         )}}
       </div>
     </div>

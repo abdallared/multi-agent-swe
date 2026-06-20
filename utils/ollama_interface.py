@@ -152,15 +152,33 @@ class OllamaInterface:
         reraise=True,
     )
     async def _call_with_retry(self, model: str, payload: dict) -> str:
-        """POST to Ollama /api/chat with automatic retry on transient failures."""
+        """POST to Ollama /api/chat with automatic retry and terminal streaming."""
+        payload["stream"] = True
         async with httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=30.0)) as client:
-            response = await client.post(
+            async with client.stream(
+                "POST",
                 f"{self.base_url}/api/chat",
                 json=payload,
-            )
-            response.raise_for_status()
-            result = response.json()
-            return result["message"]["content"]
+            ) as response:
+                response.raise_for_status()
+                full_response = []
+                async for line in response.aiter_lines():
+                    if line.strip():
+                        try:
+                            chunk = json.loads(line)
+                            token = chunk.get("message", {}).get("content", "")
+                            if token:
+                                full_response.append(token)
+                                # Print to console so the user sees progress!
+                                import sys
+                                sys.stdout.write(token)
+                                sys.stdout.flush()
+                        except json.JSONDecodeError:
+                            pass
+                import sys
+                sys.stdout.write("\n")
+                sys.stdout.flush()
+                return "".join(full_response)
 
     # ── Async Streaming ─────────────────────────────────────────
 
@@ -320,14 +338,33 @@ class OllamaInterface:
             payload["format"] = "json"
 
         try:
+            payload["stream"] = True
             response = requests.post(
                 f"{self.base_url}/api/chat",
                 json=payload,
+                stream=True,
                 timeout=600,
             )
             response.raise_for_status()
-            result = response.json()
-            response_text = result["message"]["content"]
+            
+            full_response = []
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        chunk = json.loads(line)
+                        token = chunk.get("message", {}).get("content", "")
+                        if token:
+                            full_response.append(token)
+                            import sys
+                            sys.stdout.write(token)
+                            sys.stdout.flush()
+                    except json.JSONDecodeError:
+                        pass
+            
+            import sys
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            response_text = "".join(full_response)
 
             # Cache
             self._cache.set(cache_key, response_text)
