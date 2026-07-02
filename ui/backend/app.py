@@ -16,6 +16,12 @@ import sys
 import os
 import zipfile
 import io
+from dotenv import load_dotenv
+
+# Always load the .env sitting next to this file (ui/backend/.env)
+_HERE = Path(__file__).parent
+load_dotenv(_HERE / ".env", override=True)   # backend-specific env first
+load_dotenv(override=False)                   # then fall back to project root
 
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
@@ -39,6 +45,34 @@ except Exception as e:
     project_memory = None
 
 app = FastAPI(title="AI Software Company UI")
+
+# ── Auth router ─────────────────────────────────────────────────
+import logging as _log
+_auth_logger = _log.getLogger("auth")
+try:
+    # Ensure the backend directory is on the path for auth.* imports
+    sys.path.insert(0, str(Path(__file__).parent))
+    from auth.router import router as auth_router
+    from auth.database import init_db
+    app.include_router(auth_router)
+    _auth_logger.info("Auth router mounted at /api/auth")
+except Exception as _auth_err:
+    import traceback
+    _auth_logger.error(f"Auth system FAILED to load: {_auth_err}")
+    _auth_logger.error(traceback.format_exc())
+    auth_router = None
+    init_db = None
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the database tables on startup."""
+    if init_db is not None:
+        try:
+            init_db()
+            _auth_logger.info("Database tables initialized")
+        except Exception as e:
+            _auth_logger.error(f"DB init failed (check DATABASE_URL in ui/backend/.env): {e}")
 
 # CORS
 app.add_middleware(
@@ -270,4 +304,4 @@ if __name__ == "__main__":
     print("WebSocket:          ws://localhost:8000/ws/generate")
     print("[*] Parallel execution enabled")
     print("="*60 + "\n")
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

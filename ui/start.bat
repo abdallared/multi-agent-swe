@@ -21,7 +21,7 @@ echo.
 REM Start Backend
 echo 2. Starting Backend...
 cd backend
-start "AI Software Company Backend" cmd /k "python app.py"
+start "AI Software Company Backend" cmd /k "python -X utf8 app.py"
 echo [OK] Backend started
 echo     Running on: http://localhost:8000
 echo.

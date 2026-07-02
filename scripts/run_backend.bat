@@ -6,11 +6,15 @@ echo.
 
 cd /d "%~dp0..\ui\backend"
 if errorlevel 1 (
-	echo [ERROR] Could not change directory to backend: %~dp0..\ui\backend
+	echo [ERROR] Could not change directory to backend
 	pause
 	exit /b 1
 )
 
-python app.py
+echo [OK] Working directory: %CD%
+echo [OK] Starting backend on http://localhost:8000
+echo.
+
+python -X utf8 app.py
 
 pause

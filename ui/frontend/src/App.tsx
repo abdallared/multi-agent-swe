@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Sparkles, Zap, Download, LogOut, File, Folder, FileJson, FileText, FileCode2, TerminalSquare, Brain, Activity, ArrowUp, FolderKanban } from 'lucide-react';
+import { NeuralCanvas } from './components/NeuralCanvas';
+import LoginPage from './LoginPage';
 
 // ─── Types ──────────────────────────────────────────────────────
 interface Message {
@@ -50,17 +53,31 @@ const PHASES: PhaseInfo[] = [
 ];
 
 // ─── File Icon helper ────────────────────────────────────────────
-function getFileIcon(name: string): string {
+function getFileIcon(name: string): React.ReactNode {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  const map: Record<string, string> = {
-    py: '🐍', ts: '💙', tsx: '⚛️', js: '🟨', jsx: '⚛️',
-    json: '📋', md: '📝', yml: 'yaml', yaml: '⚙️',
-    toml: '⚙️', env: '🔐', txt: '📄', css: '🎨', html: '🌐',
-    sh: '⚡', bat: '⚡', dockerfile: '🐳',
+  const s = 14;
+  if (name.toLowerCase() === 'dockerfile') return <TerminalSquare size={s} color="#3b82f6" />;
+  if (name.toLowerCase() === '.env' || name.toLowerCase() === '.env.example') return <FileCode2 size={s} color="#eab308" />;
+  
+  const extMap: Record<string, React.ReactNode> = {
+    py: <FileCode2 size={s} color="#38bdf8" />,
+    ts: <FileCode2 size={s} color="#3178c6" />,
+    tsx: <FileCode2 size={s} color="#0ea5e9" />,
+    js: <FileCode2 size={s} color="#facc15" />,
+    jsx: <FileCode2 size={s} color="#0ea5e9" />,
+    json: <FileJson size={s} color="#a8a29e" />,
+    md: <FileText size={s} color="#d6d3d1" />,
+    yml: <FileCode2 size={s} color="#f43f5e" />,
+    yaml: <FileCode2 size={s} color="#f43f5e" />,
+    toml: <FileCode2 size={s} color="#f43f5e" />,
+    env: <FileCode2 size={s} color="#eab308" />,
+    txt: <FileText size={s} color="#d6d3d1" />,
+    css: <FileCode2 size={s} color="#c084fc" />,
+    html: <FileCode2 size={s} color="#f97316" />,
+    sh: <TerminalSquare size={s} color="#4ade80" />,
+    bat: <TerminalSquare size={s} color="#4ade80" />,
   };
-  if (name.toLowerCase() === 'dockerfile') return '🐳';
-  if (name.toLowerCase() === '.env' || name.toLowerCase() === '.env.example') return '🔐';
-  return map[ext] ?? '📄';
+  return extMap[ext] ?? <File size={s} color="#a8a29e" />;
 }
 
 // ─── Spinner ─────────────────────────────────────────────────────
@@ -73,7 +90,7 @@ const Spinner: React.FC<{ size?: number }> = ({ size = 14 }) => (
 
 // ─── Phase Progress Panel ─────────────────────────────────────────
 const PhaseProgress: React.FC<{ phases: PhaseInfo[]; current: number; isGenerating: boolean }> = ({
-  phases, current, isGenerating
+  phases, current: _current, isGenerating
 }) => {
   const done = phases.filter(p => p.status === 'done').length;
   const pct = isGenerating ? Math.round((done / phases.length) * 100) : 0;
@@ -134,8 +151,8 @@ const FileTreeNode: React.FC<{
         style={{ paddingLeft: `${level * 14 + 10}px` }}
         onClick={() => onSelect(node)}
       >
-        <span style={{ fontSize: 13, flexShrink: 0 }}>{getFileIcon(node.name)}</span>
-        <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>{getFileIcon(node.name)}</span>
+        <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {node.name}
         </span>
       </div>
@@ -152,8 +169,8 @@ const FileTreeNode: React.FC<{
         <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 12, textAlign: 'center', flexShrink: 0 }}>
           {isOpen ? '▾' : '▸'}
         </span>
-        <span style={{ fontSize: 13, flexShrink: 0 }}>📁</span>
-        <span style={{ fontSize: 12, fontWeight: 500 }}>{node.name}</span>
+        <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}><Folder size={14} color="#60a5fa" /></span>
+        <span style={{ fontSize: 13, fontWeight: 500 }}>{node.name}</span>
       </div>
       {isOpen && node.children?.map(child => (
         <FileTreeNode
@@ -225,6 +242,45 @@ const MessageBubble: React.FC<{ msg: Message }> = ({ msg }) => {
 
 // ─── App ──────────────────────────────────────────────────────────
 export default function App() {
+  // ─── Auth state ──────────────────────────────────────────────
+  const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
+  const [authUser, setAuthUser]   = useState<{ email: string; full_name?: string } | null>(() => {
+    try { return JSON.parse(localStorage.getItem('auth_user') || 'null'); } catch { return null; }
+  });
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+    fetch('http://localhost:8000/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => { if (!r.ok) handleLogout(); })
+      .catch(() => {/* backend may be offline, keep token */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleLogin = (token: string, user: { email: string; full_name?: string }) => {
+    setAuthToken(token);
+    setAuthUser(user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_user');
+    setAuthToken(null);
+    setAuthUser(null);
+  };
+
+  if (!authToken) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
+  // ─── Dashboard state ──────────────────────────────────────────
+  return <Dashboard authUser={authUser} onLogout={handleLogout} />;
+}
+
+// ─── Dashboard (the original App content) ─────────────────────────
+function Dashboard({ authUser, onLogout }: { authUser: { email: string; full_name?: string } | null; onLogout: () => void }) {
   const [messages, setMessages]       = useState<Message[]>([]);
   const [input, setInput]             = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -389,13 +445,23 @@ export default function App() {
 
   // ─── Layout ──────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+
+      {/* ── Global Background (Hero) ────────────────────────── */}
+      {(messages.length === 0 && !projectName) && (
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, #0a0f1e 0%, #1a1040 50%, #0d0a2e 100%)', zIndex: 0 }}>
+          <NeuralCanvas />
+        </div>
+      )}
+
+      {/* ── Content Wrapper ─────────────────────────────────── */}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative', zIndex: 1 }}>
 
       {/* ── Top Bar ─────────────────────────────────────────── */}
       <div style={{
         height: 44,
-        background: 'var(--bg-base)',
-        borderBottom: '1px solid var(--border)',
+        background: (messages.length === 0 && !projectName) ? 'transparent' : 'var(--bg-base)',
+        borderBottom: `1px solid ${(messages.length === 0 && !projectName) ? 'rgba(255,255,255,0.05)' : 'var(--border)'}`,
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
@@ -410,13 +476,13 @@ export default function App() {
             background: 'linear-gradient(135deg, var(--accent) 0%, var(--indigo) 100%)',
             borderRadius: 7,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, fontWeight: 800, color: '#000',
+            color: '#000',
             flexShrink: 0,
-          }}>A</div>
+          }}><Sparkles size={16} /></div>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-            AI Software Company
+            OmniSWE
           </span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>— multi-agent SWE</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>— intelligent agent orchestration</span>
         </div>
 
         <div style={{ flex: 1 }} />
@@ -452,21 +518,136 @@ export default function App() {
               transition: 'all 0.12s',
             }}
           >
-            <span style={{ fontSize: 9 }}>⚡</span> Verbose
+            <span style={{ display: 'flex' }}><Zap size={11} /></span> Verbose
           </button>
           {projectName && (
             <>
               <div style={{ width: 1, height: 14, background: 'var(--border)' }} />
               <button className="btn-download" onClick={handleDownload}>
-                ↓ Download ZIP
+                <Download size={13} /> Download ZIP
               </button>
             </>
           )}
+          <div style={{ width: 1, height: 14, background: 'var(--border)' }} />
+          {/* User + logout */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+              {authUser?.full_name || authUser?.email || 'User'}
+            </span>
+            <button
+              onClick={onLogout}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                color: 'var(--text-secondary)',
+                fontSize: 11,
+                fontWeight: 500,
+                padding: '4px 8px',
+                cursor: 'pointer',
+                transition: 'all 0.12s',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--red)';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--red)';
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
+                (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+              }}
+            >
+              <LogOut size={12} /> Sign out
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ── Main content ────────────────────────────────────── */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      {(messages.length === 0 && !projectName) ? (
+        <div style={{ flex: 1, position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          
+          <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 48px', marginTop: '-80px' }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: 18,
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 24px',
+              boxShadow: '0 0 40px rgba(99,102,241,0.5)',
+              color: '#ffffff',
+            }}><Sparkles size={36} /></div>
+
+            <h1 style={{
+              fontSize: 36, fontWeight: 700, color: '#dee1f7',
+              margin: '0 0 12px',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.2,
+            }}>OmniSWE</h1>
+
+            <p style={{
+              fontSize: 14, fontWeight: 500, color: '#8b5cf6',
+              letterSpacing: '0.15em', textTransform: 'uppercase',
+              margin: '0 0 40px',
+            }}>INTELLIGENT AGENT ORCHESTRATION</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center', marginBottom: 60 }}>
+              {[
+                { icon: <Zap size={18} />, text: 'Parallel multi-agent code generation' },
+                { icon: <Brain size={18} />, text: 'Local LLM via Ollama — fully private' },
+                { icon: <Activity size={18} />, text: 'Real-time WebSocket pipeline updates' },
+              ].map((f) => (
+                <div key={f.text} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 20px',
+                  background: 'rgba(99,102,241,0.08)',
+                  border: '1px solid rgba(99,102,241,0.15)',
+                  borderRadius: 10,
+                  textAlign: 'left',
+                  width: 'fit-content'
+                }}>
+                  <span style={{ color: '#8b5cf6', display: 'flex' }}>{f.icon}</span>
+                  <span style={{ fontSize: 13, color: '#c7c4d7' }}>{f.text}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Chat Input for Hero */}
+            <div style={{
+              background: 'rgba(13,17,23,0.8)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(99,102,241,0.3)',
+              borderRadius: 16,
+              padding: 12,
+              width: 580,
+              maxWidth: '100%',
+              margin: '0 auto',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              display: 'flex', gap: 12, alignItems: 'flex-end'
+            }}>
+              <textarea
+                ref={textareaRef}
+                className="chat-input"
+                style={{ flex: 1, minHeight: 44, maxHeight: 160, background: 'transparent', border: 'none', boxShadow: 'none', padding: '12px 6px', fontSize: 15 }}
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Describe your project idea... (Enter to build)"
+                disabled={isGenerating}
+                rows={1}
+              />
+              <button
+                className="btn-send"
+                onClick={handleSend}
+                disabled={isGenerating || !input.trim()}
+                title="Send (Enter)"
+                style={{ width: 44, height: 44, borderRadius: 10, marginBottom: 2 }}
+              >
+                {isGenerating ? <Spinner size={18} /> : <ArrowUp size={20} strokeWidth={3} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         {/* ── Left: File Explorer ───────────────────────────── */}
         <div className="panel" style={{ width: 256, flexShrink: 0 }}>
@@ -492,7 +673,7 @@ export default function App() {
               </div>
             ) : (
               <div style={{ padding: '40px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.3 }}>📁</div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12, opacity: 0.3 }}><FolderKanban size={28} /></div>
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
                   No project yet.<br />Describe your idea →
                 </p>
@@ -527,8 +708,8 @@ export default function App() {
                 fontWeight: 500,
                 flexShrink: 0,
               }}>
-                <span>{getFileIcon(selectedFile.split('/').pop() ?? '')}</span>
-                <span>{selectedFile.split('/').pop()}</span>
+                <span style={{ display: 'flex' }}>{getFileIcon(selectedFile.split('/').pop() ?? '')}</span>
+                <span style={{ fontSize: 13 }}>{selectedFile.split('/').pop()}</span>
                 <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                   {selectedFile.includes('/') ? selectedFile.substring(0, selectedFile.lastIndexOf('/')) : ''}
                 </span>
@@ -552,7 +733,7 @@ export default function App() {
               <pre className="code-view mono animate-fadeIn">{fileContent}</pre>
             ) : (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <div style={{ fontSize: 48, opacity: 0.15 }}>{'</>'}</div>
+                <div style={{ opacity: 0.15, display: 'flex' }}><FileCode2 size={48} /></div>
                 <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.7 }}>
                   Select a file from the explorer<br/>to preview its contents
                 </p>
@@ -709,54 +890,8 @@ export default function App() {
           {/* Phase progress */}
           <PhaseProgress phases={phases} current={currentPhase} isGenerating={isGenerating || phases.some(p => p.status === 'done')} />
 
-          {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {messages.length === 0 && (
-              <div style={{ padding: '32px 8px', textAlign: 'center' }} className="animate-fadeIn">
-                <div style={{
-                  width: 44, height: 44,
-                  background: 'linear-gradient(135deg, var(--accent-dim), var(--indigo-dim))',
-                  border: '1px solid var(--border-light)',
-                  borderRadius: 12,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 14px',
-                  fontSize: 20,
-                }}>✦</div>
-                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 6 }}>
-                  Ready to build
-                </p>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: 16 }}>
-                  Describe your project and the multi-agent<br/>pipeline will generate it for you.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {[
-                    'Blog platform with auth & comments',
-                    'Task manager with team workspaces',
-                    'E-commerce API with Stripe payments',
-                  ].map(example => (
-                    <button
-                      key={example}
-                      onClick={() => { setInput(example); textareaRef.current?.focus(); }}
-                      style={{
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 8,
-                        padding: '7px 12px',
-                        fontSize: 11.5,
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        transition: 'all 0.12s',
-                      }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(0,229,179,0.3)')}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-                    >
-                      {example}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Messages */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
             {messages.map(msg => (
               <MessageBubble key={msg.id} msg={msg} />
@@ -789,7 +924,7 @@ export default function App() {
                 disabled={isGenerating || !input.trim()}
                 title="Send (Enter)"
               >
-                {isGenerating ? <Spinner size={16} /> : '↑'}
+                {isGenerating ? <Spinner size={16} /> : <ArrowUp size={18} strokeWidth={2.5} />}
               </button>
             </div>
             <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
@@ -799,9 +934,13 @@ export default function App() {
         </div>
 
       </div>
+      )}
 
       {/* ── Status Bar ──────────────────────────────────────── */}
-      <div className="statusbar">
+      <div className="statusbar" style={{
+        background: (messages.length === 0 && !projectName) ? 'transparent' : 'var(--bg-surface)',
+        borderTop: `1px solid ${(messages.length === 0 && !projectName) ? 'rgba(255,255,255,0.05)' : 'var(--border)'}`
+      }}>
         <div className="statusbar-item">
           <div className="dot dot-green" style={{ width: 6, height: 6 }} />
           <span>Ollama local</span>
@@ -821,6 +960,7 @@ export default function App() {
             multi-agent-swe v2.0
           </div>
         )}
+      </div>
       </div>
     </div>
   );
