@@ -1,0 +1,8 @@
+ 1- backend & database (Fathy)
+
+ 2- frontend  (mostafa)
+ 
+ 3- agents (Hend , taha  , david)
+
+ 4- integration & walkthrough (boda)
+
